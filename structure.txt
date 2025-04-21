@@ -1,0 +1,45 @@
+turf-booking/
+├── admin/                              # Admin-facing functionality
+│   ├── class-turf-booking-admin.php    # Admin class
+│   ├── css/                            # Admin stylesheets
+│   ├── js/                             # Admin JavaScript files
+│   └── partials/                       # Admin view templates
+│
+├── includes/                           # Core plugin files
+│   ├── class-turf-booking.php          # Main plugin class
+│   ├── class-turf-booking-activator.php # Plugin activator
+│   ├── class-turf-booking-deactivator.php # Plugin deactivator
+│   ├── class-turf-booking-i18n.php     # Internationalization
+│   ├── class-turf-booking-loader.php   # Hook loader
+│   ├── class-turf-booking-post-types.php # Custom post types
+│   ├── class-turf-booking-bookings.php # Booking functionality
+│   ├── class-turf-booking-courts.php   # Court functionality
+│   ├── class-turf-booking-payments.php # Payment processing (Razorpay)
+│   ├── class-turf-booking-user-dashboard.php # User dashboard
+│   └── class-turf-booking-shortcodes.php # Shortcodes
+│
+├── languages/                          # Internationalization files
+│
+├── public/                             # Public-facing functionality
+│   ├── class-turf-booking-public.php   # Public class
+│   ├── css/                            # Public stylesheets
+│   │   └── turf-booking-public.css     # Main public CSS  -- imcomplete
+│   ├── js/                             # Public JavaScript files
+│   │   └── turf-booking-public.js      # Main public JS
+│   ├── partials/                       # Public view partials
+│   └── templates/                      # Page templates
+│       ├── single-court.php            # Single court template
+│       ├── archive-court.php           # Court listing template
+│       ├── content-court-card.php      # Court card template (reusable)
+│       ├── booking-form.php            # Booking form template
+│       ├── checkout.php                # Checkout page template
+│       └── user-dashboard.php          # User dashboard template
+│
+├── assets/                             # Plugin assets
+│   ├── css/                            # Common stylesheets
+│   ├── js/                             # Common JavaScript files
+│   └── images/                         # Plugin images
+│
+├── uninstall.php                       # Cleanup on uninstall
+├── index.php                           # Silence is golden
+└── turf-booking.php                    # Main plugin file
