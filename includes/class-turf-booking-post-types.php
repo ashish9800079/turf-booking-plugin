@@ -2161,6 +2161,9 @@ public function add_facility_ajax() {
             return;
         }
         
+        // Get the old status to check if it was changed
+        $old_status = get_post_meta($post_id, '_tb_booking_status', true);
+        
         // Save booking details
         if (isset($_POST['tb_booking_court_id'])) {
             update_post_meta($post_id, '_tb_booking_court_id', absint($_POST['tb_booking_court_id']));
@@ -2178,8 +2181,10 @@ public function add_facility_ajax() {
             update_post_meta($post_id, '_tb_booking_time_to', sanitize_text_field($_POST['tb_booking_time_to']));
         }
         
+        $new_status = '';
         if (isset($_POST['tb_booking_status'])) {
-            update_post_meta($post_id, '_tb_booking_status', sanitize_text_field($_POST['tb_booking_status']));
+            $new_status = sanitize_text_field($_POST['tb_booking_status']);
+            update_post_meta($post_id, '_tb_booking_status', $new_status);
         }
         
         // Save user details
@@ -2210,6 +2215,12 @@ public function add_facility_ajax() {
         
         if (isset($_POST['tb_booking_payment_date'])) {
             update_post_meta($post_id, '_tb_booking_payment_date', sanitize_text_field($_POST['tb_booking_payment_date']));
+        }
+        
+        // If status changed to confirmed, trigger Hudle sync
+        if ($old_status !== 'confirmed' && $new_status === 'confirmed') {
+            // Sync to Hudle
+            do_action('tb_after_booking_confirmed', $post_id);
         }
     }
     
