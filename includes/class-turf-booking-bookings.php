@@ -181,7 +181,38 @@ public function create_booking() {
         wp_send_json_error(array('message' => __('Invalid court selected', 'turf-booking')));
     }
     
-    // Check if the slot is available
+    // Verify slot availability with Hudle if integrated
+    global $tb_hudle_api;
+    if ($tb_hudle_api && $tb_hudle_api->court_has_hudle_integration($court_id)) {
+        // Check if slot is available in Hudle
+        $slots = $tb_hudle_api->get_slots($court_id, $date);
+        
+        if (!is_wp_error($slots)) {
+            $slot_available = true;
+            $booking_start = new DateTime($date . ' ' . $time_from);
+            $booking_end = new DateTime($date . ' ' . $time_to);
+            
+            foreach ($slots as $slot) {
+                if (!$slot['is_available'] || $slot['inventory_count'] == 0) {
+                    $slot_start = new DateTime($slot['start_time']);
+                    $slot_end = new DateTime($slot['end_time']);
+                    
+                    if (($slot_start < $booking_end && $slot_end > $booking_start) || 
+                        ($slot_start == $booking_start || $slot_end == $booking_end)) {
+                        $slot_available = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$slot_available) {
+                wp_send_json_error(array('message' => __('This time slot is no longer available in Hudle. Please select another time.', 'turf-booking')));
+                return;
+            }
+        }
+    }
+    
+    // Check if the slot is available in our system
     global $wpdb;
     $table_name = $wpdb->prefix . 'tb_booking_slots';
     
@@ -209,6 +240,7 @@ public function create_booking() {
     
     if ($existing_booking > 0) {
         wp_send_json_error(array('message' => __('This time slot is no longer available', 'turf-booking')));
+        return;
     }
     
     // Create booking post
@@ -228,6 +260,7 @@ public function create_booking() {
     
     if (is_wp_error($booking_id)) {
         wp_send_json_error(array('message' => __('Failed to create booking', 'turf-booking')));
+        return;
     }
     
     // Save booking meta
@@ -352,6 +385,9 @@ public function create_booking() {
     if ($confirmation_method === 'auto') {
         update_post_meta($booking_id, '_tb_booking_status', 'confirmed');
         $this->send_booking_confirmation_email($booking_id);
+        
+        // Sync to Hudle when booking is confirmed
+        do_action('tb_after_booking_confirmed', $booking_id);
     } else {
         $this->send_booking_pending_email($booking_id);
     }
@@ -368,10 +404,6 @@ public function create_booking() {
             ? add_query_arg('booking_id', $booking_id, get_permalink(get_option('tb_page_settings')['checkout']))
             : add_query_arg('booking_id', $booking_id, get_permalink(get_option('tb_page_settings')['booking-confirmation']))
     ));
-
-    // Trigger action for Hudle integration
-do_action('tb_after_booking_confirmed', $booking_id);
-
 }
     
     /**
