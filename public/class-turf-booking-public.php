@@ -67,6 +67,7 @@ public function enqueue_scripts() {
     // Original scripts
     wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/turf-booking-public.js', array( 'jquery' ), $this->version, true );
     
+    
     // Add jQuery UI if needed for datepickers and sliders
     wp_enqueue_script( 'jquery-ui-datepicker' );
     wp_enqueue_script( 'jquery-ui-slider' );
@@ -666,10 +667,12 @@ private function update_court_rating($court_id) {
 
     public function check_hudle_slot_availability_ajax() {
         global $tb_hudle_api;
-        if ($tb_hudle_api) {
-            $tb_hudle_api->check_slot_availability_ajax();
-        } else {
+        
+        if (!$tb_hudle_api) {
             wp_send_json_error(array('message' => 'Hudle API not initialized'));
+            return;
         }
+        
+        $tb_hudle_api->check_slot_availability_ajax();
     }
 }
