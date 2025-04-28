@@ -155,8 +155,11 @@ class Turf_Booking {
      */
     private function define_public_hooks() {
         
-        $plugin_hudle_api = new Turf_Booking_Hudle_API();
+        
         $plugin_public = new Turf_Booking_Public($this->get_plugin_name(), $this->get_version());
+
+        $hudle_api = new Turf_Booking_Hudle_API();
+        $GLOBALS['tb_hudle_api'] = $hudle_api;
 
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
@@ -171,6 +174,12 @@ class Turf_Booking {
         
         $this->loader->add_action('wp_ajax_create_booking', $plugin_public, 'create_booking');
         $this->loader->add_action('wp_ajax_nopriv_create_booking', $plugin_public, 'create_booking');
+
+        $this->loader->add_action('wp_ajax_check_hudle_slot_availability', $hudle_api, 'check_slot_availability_ajax');
+    $this->loader->add_action('wp_ajax_nopriv_check_hudle_slot_availability', $hudle_api, 'check_slot_availability_ajax');
+    
+    // Add action for syncing bookings to Hudle
+    $this->loader->add_action('tb_after_booking_confirmed', $hudle_api, 'sync_booking_to_hudle');
         
         $this->loader->add_action('wp_ajax_tb_submit_review', $plugin_public, 'submit_review');
         $this->loader->add_action('wp_ajax_nopriv_tb_submit_review', $plugin_public, 'submit_review');
