@@ -368,6 +368,10 @@ public function create_booking() {
             ? add_query_arg('booking_id', $booking_id, get_permalink(get_option('tb_page_settings')['checkout']))
             : add_query_arg('booking_id', $booking_id, get_permalink(get_option('tb_page_settings')['booking-confirmation']))
     ));
+
+    // Trigger action for Hudle integration
+do_action('tb_after_booking_confirmed', $booking_id);
+
 }
     
     /**
