@@ -1288,6 +1288,9 @@ public function sanitize_page_settings($input) {
         
         wp_mail($to, $subject, nl2br($message), $headers);
         
+        // Sync to Hudle
+        do_action('tb_after_booking_confirmed', $booking_id);
+        
         return true;
     }
     
@@ -1836,11 +1839,41 @@ public function create_manual_booking() {
         wp_send_json_error(array('message' => __('Invalid court selected', 'turf-booking')));
     }
     
+    // If this court has Hudle integration, verify availability in Hudle first
+    global $tb_hudle_api;
+    if ($tb_hudle_api && $tb_hudle_api->court_has_hudle_integration($court_id)) {
+        // Check if slot is available in Hudle
+        $slots = $tb_hudle_api->get_slots($court_id, $date);
+        
+        if (!is_wp_error($slots)) {
+            $slot_available = true;
+            $booking_start = new DateTime($date . ' ' . $time_from);
+            $booking_end = new DateTime($date . ' ' . $time_to);
+            
+            foreach ($slots as $slot) {
+                if (!$slot['is_available'] || $slot['inventory_count'] == 0) {
+                    $slot_start = new DateTime($slot['start_time']);
+                    $slot_end = new DateTime($slot['end_time']);
+                    
+                    if (($slot_start < $booking_end && $slot_end > $booking_start) || 
+                        ($slot_start == $booking_start || $slot_end == $booking_end)) {
+                        $slot_available = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$slot_available) {
+                wp_send_json_error(array('message' => __('This time slot is already booked in Hudle. Please select another time.', 'turf-booking')));
+                return;
+            }
+        }
+    }
+    
     // Check if the slot is available
     global $wpdb;
     $table_name = $wpdb->prefix . 'tb_booking_slots';
     
-   
     $existing_booking = $wpdb->get_var(
         $wpdb->prepare(
             "SELECT COUNT(*) FROM $table_name 
@@ -1971,6 +2004,9 @@ public function create_manual_booking() {
         });
         
         do_action('send_booking_confirmation_email');
+        
+        // Sync to Hudle
+        do_action('tb_after_booking_confirmed', $booking_id);
     }
     
     wp_send_json_success(array(
