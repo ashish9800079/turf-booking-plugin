@@ -35,6 +35,10 @@ class Turf_Booking_Public {
     public function __construct( $plugin_name, $version ) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
+
+        add_action('wp_ajax_check_hudle_slot_availability', array($this, 'check_hudle_slot_availability_ajax'));
+add_action('wp_ajax_nopriv_check_hudle_slot_availability', array($this, 'check_hudle_slot_availability_ajax'));
+
     }
 
     /**
@@ -658,5 +662,14 @@ private function update_court_rating($court_id) {
         );
         
         return rest_ensure_response( $response );
+    }
+
+    public function check_hudle_slot_availability_ajax() {
+        global $tb_hudle_api;
+        if ($tb_hudle_api) {
+            $tb_hudle_api->check_slot_availability_ajax();
+        } else {
+            wp_send_json_error(array('message' => 'Hudle API not initialized'));
+        }
     }
 }
