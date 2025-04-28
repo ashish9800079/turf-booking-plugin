@@ -37,7 +37,8 @@ class Turf_Booking_Admin {
         $this->version = $version;
         
       add_action('admin_init', array($this, 'register_settings'));
-
+      add_action('admin_init', array($this, 'register_hudle_settings'));
+      add_action('admin_menu', array($this, 'add_hudle_settings_page'), 20);
     }
     
  
@@ -2022,4 +2023,104 @@ public function create_manual_booking() {
         
         return str_replace(array_keys($placeholders), array_values($placeholders), $content);
     }
+
+    /**
+ * Add Hudle settings page to the admin menu
+ */
+public function add_hudle_settings_page() {
+    add_submenu_page(
+        'turf-booking',
+        __('Hudle Integration', 'turf-booking'),
+        __('Hudle Integration', 'turf-booking'),
+        'manage_options',
+        'turf-booking-hudle',
+        array($this, 'display_hudle_settings_page')
+    );
+}
+
+/**
+ * Display the Hudle settings page
+ */
+public function display_hudle_settings_page() {
+    require_once TURF_BOOKING_PLUGIN_DIR . 'admin/partials/turf-booking-admin-hudle-settings.php';
+}
+
+/**
+ * Register Hudle settings
+ */
+public function register_hudle_settings() {
+    // Register settings
+    register_setting('tb_hudle_settings', 'tb_hudle_api_token');
+    register_setting('tb_hudle_settings', 'tb_hudle_venue_id');
+    register_setting('tb_hudle_settings', 'tb_hudle_debug_mode');
+    
+    // Add settings section
+    add_settings_section(
+        'tb_hudle_api_settings',
+        __('Hudle API Settings', 'turf-booking'),
+        array($this, 'hudle_api_settings_callback'),
+        'tb_hudle_settings'
+    );
+    
+    // Add settings fields
+    add_settings_field(
+        'tb_hudle_api_token',
+        __('API Token', 'turf-booking'),
+        array($this, 'hudle_api_token_callback'),
+        'tb_hudle_settings',
+        'tb_hudle_api_settings'
+    );
+    
+    add_settings_field(
+        'tb_hudle_venue_id',
+        __('Venue ID', 'turf-booking'),
+        array($this, 'hudle_venue_id_callback'),
+        'tb_hudle_settings',
+        'tb_hudle_api_settings'
+    );
+    
+    add_settings_field(
+        'tb_hudle_debug_mode',
+        __('Debug Mode', 'turf-booking'),
+        array($this, 'hudle_debug_mode_callback'),
+        'tb_hudle_settings',
+        'tb_hudle_api_settings'
+    );
+}
+
+/**
+ * Hudle API settings section callback
+ */
+public function hudle_api_settings_callback() {
+    echo '<p>' . __('Configure your Hudle API integration. This allows your bookings to be synced with Hudle.', 'turf-booking') . '</p>';
+}
+
+/**
+ * API Token field callback
+ */
+public function hudle_api_token_callback() {
+    $api_token = get_option('tb_hudle_api_token', '');
+    echo '<input type="password" id="tb_hudle_api_token" name="tb_hudle_api_token" value="' . esc_attr($api_token) . '" class="regular-text">';
+    echo '<p class="description">' . __('Enter your Hudle API token for authentication', 'turf-booking') . '</p>';
+}
+
+/**
+ * Venue ID field callback
+ */
+public function hudle_venue_id_callback() {
+    $venue_id = get_option('tb_hudle_venue_id', '');
+    echo '<input type="text" id="tb_hudle_venue_id" name="tb_hudle_venue_id" value="' . esc_attr($venue_id) . '" class="regular-text">';
+    echo '<p class="description">' . __('Enter your Hudle venue ID (e.g., 670ab825-c490-4793-9175-87b0c854f2a0)', 'turf-booking') . '</p>';
+}
+
+/**
+ * Debug Mode field callback
+ */
+public function hudle_debug_mode_callback() {
+    $debug_mode = get_option('tb_hudle_debug_mode', false);
+    echo '<input type="checkbox" id="tb_hudle_debug_mode" name="tb_hudle_debug_mode" value="1" ' . checked(1, $debug_mode, false) . '>';
+    echo '<label for="tb_hudle_debug_mode">' . __('Enable debug logging for Hudle API', 'turf-booking') . '</label>';
+}
+
+
 }
