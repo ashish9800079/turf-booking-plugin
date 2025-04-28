@@ -411,6 +411,10 @@ public function render_booking_addons_meta_box($post) {
         $court_size = get_post_meta($post->ID, '_tb_court_size', true);
         $court_capacity = get_post_meta($post->ID, '_tb_court_capacity', true);
         $court_rating = get_post_meta($post->ID, '_tb_court_rating', true);
+        $hudle_facility_id = get_post_meta($post->ID, '_tb_hudle_facility_id', true);
+        $hudle_activity_id = get_post_meta($post->ID, '_tb_hudle_activity_id', true);
+
+
         
         // Output fields
         ?>
@@ -442,6 +446,25 @@ public function render_booking_addons_meta_box($post) {
                     <p class="description"><?php _e('Rating from 0 to 5', 'turf-booking'); ?></p>
                 </td>
             </tr>
+            
+            <tr>
+            <th scope="row">
+                <label for="tb_hudle_facility_id"><?php _e('Hudle Facility ID', 'turf-booking'); ?></label>
+            </th>
+            <td>
+                <input type="text" id="tb_hudle_facility_id" name="tb_hudle_facility_id" value="<?php echo esc_attr($hudle_facility_id); ?>" class="regular-text">
+                <p class="description"><?php _e('Enter the Hudle facility ID for this court (e.g., 0fc43534-7406-446b-98ae-0dd4ce4c7171)', 'turf-booking'); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">
+                <label for="tb_hudle_activity_id"><?php _e('Hudle Activity ID', 'turf-booking'); ?></label>
+            </th>
+            <td>
+                <input type="text" id="tb_hudle_activity_id" name="tb_hudle_activity_id" value="<?php echo esc_attr($hudle_activity_id); ?>" class="regular-text">
+                <p class="description"><?php _e('Enter the Hudle activity ID for this court (e.g., 165)', 'turf-booking'); ?></p>
+            </td>
+        </tr>
         </table>
         <?php
     }
@@ -1908,7 +1931,13 @@ public function get_court_addons($court_id) {
         if (isset($_POST['tb_court_rating'])) {
             update_post_meta($post_id, '_tb_court_rating', floatval($_POST['tb_court_rating']));
         }
-        
+        if (isset($_POST['tb_hudle_facility_id'])) {
+            update_post_meta($post_id, '_tb_hudle_facility_id', sanitize_text_field($_POST['tb_hudle_facility_id']));
+        }
+        if (isset($_POST['tb_hudle_activity_id'])) {
+            update_post_meta($post_id, '_tb_hudle_activity_id', sanitize_text_field($_POST['tb_hudle_activity_id']));
+        }
+
         // Save court pricing
         if (isset($_POST['tb_court_base_price'])) {
             update_post_meta($post_id, '_tb_court_base_price', floatval($_POST['tb_court_base_price']));
@@ -1952,6 +1981,7 @@ public function get_court_addons($court_id) {
             update_post_meta($post_id, '_tb_court_longitude', sanitize_text_field($_POST['tb_court_longitude']));
         }
 
+        
 
         if (isset($_POST['tb_court_rules']) && is_array($_POST['tb_court_rules'])) {
             $rules = array();
