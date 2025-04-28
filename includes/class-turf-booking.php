@@ -51,6 +51,7 @@ class Turf_Booking {
         $this->define_public_hooks();
         $this->define_post_types();
         $this->define_shortcodes();
+        $this->define_user_dashboard();
     }
 
     /**
@@ -83,6 +84,7 @@ class Turf_Booking {
          */
         require_once TURF_BOOKING_PLUGIN_DIR . 'public/class-turf-booking-public.php';
 
+        require_once TURF_BOOKING_PLUGIN_DIR . 'includes/class-turf-booking-hudle-api.php';
         /**
          * The class responsible for defining all custom post types.
          */
@@ -153,7 +155,7 @@ class Turf_Booking {
      */
     private function define_public_hooks() {
         
-
+        $plugin_hudle_api = new Turf_Booking_Hudle_API();
         $plugin_public = new Turf_Booking_Public($this->get_plugin_name(), $this->get_version());
 
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_styles');
@@ -187,6 +189,27 @@ $this->loader->add_action('wp_ajax_nopriv_verify_razorpay_payment', $plugin_paym
   
         
     }
+
+    /**
+ * Define user dashboard hooks and handlers
+ */
+private function define_user_dashboard() {
+    $user_dashboard = new Turf_Booking_User_Dashboard();
+    
+    // Add AJAX actions for the dashboard
+    $this->loader->add_action('wp_ajax_tb_dashboard_actions', $user_dashboard, 'ajax_dashboard_actions');
+    $this->loader->add_action('wp_ajax_nopriv_tb_dashboard_actions', $user_dashboard, 'ajax_dashboard_actions');
+    
+    // Add profile image handlers
+    $this->loader->add_action('wp_ajax_tb_profile_image_upload', $user_dashboard, 'process_profile_image_upload');
+    $this->loader->add_action('wp_ajax_tb_profile_image_remove', $user_dashboard, 'remove_profile_image');
+    
+    // Add profile update handler
+    $this->loader->add_action('admin_post_tb_update_profile', $user_dashboard, 'process_profile_update');
+    $this->loader->add_action('admin_post_nopriv_tb_update_profile', $user_dashboard, 'process_profile_update');
+}
+
+
 
     /**
      * Register all custom post types.
