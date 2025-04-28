@@ -31,13 +31,7 @@ class Turf_Booking_Hudle_API {
         $this->api_token = get_option('tb_hudle_api_token', '');
         $this->venue_id = get_option('tb_hudle_venue_id', '');
         $this->debug_mode = get_option('tb_hudle_debug_mode', false);
-        
-        // Hook into booking creation
-        add_action('tb_after_booking_confirmed', array($this, 'sync_booking_to_hudle'), 10, 1);
-        
-        // Add AJAX handlers for checking slot availability
-        add_action('wp_ajax_check_hudle_slot_availability', array($this, 'check_slot_availability_ajax'));
-        add_action('wp_ajax_nopriv_check_hudle_slot_availability', array($this, 'check_slot_availability_ajax'));
+
     }
     
     /**
@@ -57,6 +51,7 @@ class Turf_Booking_Hudle_API {
      */
     public function get_slots($court_id, $date) {
         if (!$this->court_has_hudle_integration($court_id)) {
+            $this->log_debug("Court $court_id doesn't have Hudle integration");
             return new WP_Error('integration_missing', __('This court is not integrated with Hudle', 'turf-booking'));
         }
         
@@ -69,6 +64,8 @@ class Turf_Booking_Hudle_API {
             $facility_id,
             $date
         );
+        
+        $this->log_debug("Requesting Hudle slots: $url");
         
         $response = wp_remote_get($url, array(
             'headers' => array(
@@ -83,6 +80,8 @@ class Turf_Booking_Hudle_API {
         
         $body = json_decode(wp_remote_retrieve_body($response), true);
         $status_code = wp_remote_retrieve_response_code($response);
+        
+        $this->log_debug("Hudle API response: " . wp_remote_retrieve_body($response));
         
         if ($status_code !== 200 || !isset($body['success']) || $body['success'] !== true) {
             $error_message = isset($body['message']) ? $body['message'] : 'Unknown error';
@@ -104,62 +103,78 @@ class Turf_Booking_Hudle_API {
         
         $court_id = isset($_POST['court_id']) ? absint($_POST['court_id']) : 0;
         $date = isset($_POST['date']) ? sanitize_text_field($_POST['date']) : '';
-        $time_from = isset($_POST['time_from']) ? sanitize_text_field($_POST['time_from']) : '';
-        $time_to = isset($_POST['time_to']) ? sanitize_text_field($_POST['time_to']) : '';
         
-        if (!$court_id || !$date || !$time_from || !$time_to) {
+        if (!$court_id || !$date) {
             wp_send_json_error(array('message' => __('Missing required fields', 'turf-booking')));
         }
         
         // Only perform this check if Hudle integration is enabled for this court
         if (!$this->court_has_hudle_integration($court_id)) {
-            wp_send_json_success(array('available' => true)); // Skip check if no integration
+            $this->log_debug("Court $court_id doesn't have Hudle integration, skipping check");
+            wp_send_json_success(array('available' => true, 'hudle_integrated' => false));
+            return;
         }
         
         // Get slots from Hudle
         $slots = $this->get_slots($court_id, $date);
         
         if (is_wp_error($slots)) {
+            $this->log_error("Error getting slots from Hudle: " . $slots->get_error_message());
             wp_send_json_error(array('message' => $slots->get_error_message()));
+            return;
         }
         
-        // Convert booking times to DateTime objects for comparison
-        $booking_start = new DateTime($date . ' ' . $time_from);
-        $booking_end = new DateTime($date . ' ' . $time_to);
-        
-        // Check if any of the required slots are unavailable
-        $unavailable_slots = array();
-        
-        foreach ($slots as $slot) {
-            // Skip available slots
-            if ($slot['is_available'] === true) {
-                continue;
+        // If checking for a specific time slot
+        if (isset($_POST['time_from']) && isset($_POST['time_to'])) {
+            $time_from = sanitize_text_field($_POST['time_from']);
+            $time_to = sanitize_text_field($_POST['time_to']);
+            
+            // Convert booking times to DateTime objects for comparison
+            $booking_start = new DateTime($date . ' ' . $time_from);
+            $booking_end = new DateTime($date . ' ' . $time_to);
+            
+            // Check if any of the required slots are unavailable
+            $unavailable_slots = array();
+            
+            foreach ($slots as $slot) {
+                // Skip available slots
+                if ($slot['is_available'] === true || $slot['inventory_count'] == 0) {
+                    continue;
+                }
+                
+                // Convert slot times to DateTime objects
+                $slot_start = new DateTime($slot['start_time']);
+                $slot_end = new DateTime($slot['end_time']);
+                
+                // Check if this slot overlaps with our booking
+                if (
+                    ($slot_start < $booking_end && $slot_end > $booking_start) ||
+                    ($slot_start == $booking_start || $slot_end == $booking_end)
+                ) {
+                    $unavailable_slots[] = array(
+                        'start_time' => $slot['start_time'],
+                        'end_time' => $slot['end_time']
+                    );
+                }
             }
             
-            // Convert slot times to DateTime objects
-            $slot_start = new DateTime($slot['start_time']);
-            $slot_end = new DateTime($slot['end_time']);
-            
-            // Check if this slot overlaps with our booking
-            if (
-                ($slot_start < $booking_end && $slot_end > $booking_start) ||
-                ($slot_start == $booking_start || $slot_end == $booking_end)
-            ) {
-                $unavailable_slots[] = array(
-                    'start_time' => $slot['start_time'],
-                    'end_time' => $slot['end_time']
-                );
+            if (count($unavailable_slots) > 0) {
+                wp_send_json_error(array(
+                    'message' => __('This slot is already booked in Hudle', 'turf-booking'),
+                    'unavailable_slots' => $unavailable_slots
+                ));
+                return;
             }
-        }
-        
-        if (count($unavailable_slots) > 0) {
-            wp_send_json_error(array(
-                'message' => __('This slot is already booked in Hudle', 'turf-booking'),
-                'unavailable_slots' => $unavailable_slots
+            
+            wp_send_json_success(array('available' => true, 'hudle_integrated' => true));
+        } else {
+            // If just checking for all slots, return the full data
+            wp_send_json_success(array(
+                'available' => true,
+                'hudle_integrated' => true,
+                'slots' => $slots
             ));
         }
-        
-        wp_send_json_success(array('available' => true));
     }
     
     /**
@@ -169,11 +184,13 @@ class Turf_Booking_Hudle_API {
      * @return bool|WP_Error
      */
     public function sync_booking_to_hudle($booking_id) {
+        $this->log_debug("Attempting to sync booking #$booking_id to Hudle");
+        
         // Get booking details
         $court_id = get_post_meta($booking_id, '_tb_booking_court_id', true);
         
         if (!$this->court_has_hudle_integration($court_id)) {
-            // Skip if no Hudle integration
+            $this->log_debug("Court #$court_id is not integrated with Hudle, skipping sync");
             return false;
         }
         
@@ -186,27 +203,33 @@ class Turf_Booking_Hudle_API {
         $user_email = get_post_meta($booking_id, '_tb_booking_user_email', true);
         $user_phone = get_post_meta($booking_id, '_tb_booking_user_phone', true);
         
+        $this->log_debug("Booking details: Court ID: $court_id, Facility ID: $facility_id, Date: $date, Time: $time_from - $time_to");
+        
         // Generate timestamps for each 30-minute slot
-        $current_time = strtotime($date . ' ' . $time_from);
-        $end_time = strtotime($date . ' ' . $time_to);
+        $start_datetime = new DateTime($date . ' ' . $time_from);
+        $end_datetime = new DateTime($date . ' ' . $time_to);
+        
+        $current_time = clone $start_datetime;
         $timestamps = array();
         
-        while ($current_time < $end_time) {
-            $timestamps[] = date('Y-m-d H:i:s', $current_time);
-            $current_time += 30 * 60; // Add 30 minutes
+        while ($current_time < $end_datetime) {
+            $timestamps[] = $current_time->format('Y-m-d H:i:s');
+            $current_time->add(new DateInterval('PT30M')); // Add 30 minutes
         }
         
         if (empty($timestamps)) {
-            $this->log_error('No valid timestamps generated for booking #' . $booking_id);
+            $this->log_error("No valid timestamps generated for booking #$booking_id");
             return new WP_Error('invalid_time', __('Could not generate valid time slots', 'turf-booking'));
         }
+        
+        $this->log_debug("Generated " . count($timestamps) . " timestamps for booking");
         
         // Build the request body
         $body = array();
         
         // Add timestamps
         foreach ($timestamps as $index => $timestamp) {
-            $body["start_timestamps[{$index}]"] = $timestamp;
+            $body["start_timestamps[$index]"] = $timestamp;
         }
         
         // Add user details
@@ -218,7 +241,7 @@ class Turf_Booking_Hudle_API {
         $body['user_details[date_of_birth]'] = '1990-01-01'; // Default value
         
         // Add note
-        $body['note'] = sprintf(__('Booking #%d from Turf Booking plugin', 'turf-booking'), $booking_id);
+        $body['note'] = sprintf(__('Booking #%d from District9', 'turf-booking'), $booking_id);
         
         // Add activity id if available
         if (!empty($activity_id)) {
@@ -231,6 +254,8 @@ class Turf_Booking_Hudle_API {
             $this->venue_id,
             $facility_id
         );
+        
+        $this->log_debug("Sending booking to Hudle: $url with data: " . json_encode($body));
         
         $response = wp_remote_post($url, array(
             'method' => 'POST',
@@ -249,7 +274,10 @@ class Turf_Booking_Hudle_API {
             return $response;
         }
         
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $response_body = wp_remote_retrieve_body($response);
+        $this->log_debug("Hudle booking API response: $response_body");
+        
+        $body = json_decode($response_body, true);
         $status_code = wp_remote_retrieve_response_code($response);
         
         if ($status_code !== 201 || !isset($body['success']) || $body['success'] !== true) {
@@ -278,6 +306,12 @@ class Turf_Booking_Hudle_API {
     private function log_error($message) {
         if ($this->debug_mode) {
             error_log('Hudle API Error: ' . $message);
+            
+            // Also write to a debug file in the plugin directory if writable
+            $log_file = TURF_BOOKING_PLUGIN_DIR . 'hudle-debug.log';
+            if (is_writable(TURF_BOOKING_PLUGIN_DIR)) {
+                file_put_contents($log_file, date('[Y-m-d H:i:s]') . ' ERROR: ' . $message . "\n", FILE_APPEND);
+            }
         }
     }
     
@@ -287,6 +321,12 @@ class Turf_Booking_Hudle_API {
     private function log_debug($message) {
         if ($this->debug_mode) {
             error_log('Hudle API Debug: ' . $message);
+            
+            // Also write to a debug file in the plugin directory if writable
+            $log_file = TURF_BOOKING_PLUGIN_DIR . 'hudle-debug.log';
+            if (is_writable(TURF_BOOKING_PLUGIN_DIR)) {
+                file_put_contents($log_file, date('[Y-m-d H:i:s]') . ' DEBUG: ' . $message . "\n", FILE_APPEND);
+            }
         }
     }
 }
