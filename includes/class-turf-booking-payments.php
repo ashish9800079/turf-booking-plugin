@@ -264,6 +264,10 @@ class Turf_Booking_Payments {
         
         // Update booking status to confirmed
         update_post_meta($booking_id, '_tb_booking_status', 'confirmed');
+        
+        do_action('tb_after_booking_confirmed', $booking_id);
+
+
     
         
         // Record payment in database

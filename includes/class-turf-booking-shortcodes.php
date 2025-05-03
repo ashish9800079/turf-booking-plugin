@@ -150,9 +150,9 @@ class Turf_Booking_Shortcodes {
                                 <i class="fas fa-search"></i>
                             </span>
                             <div class="tb-search-input">
-                                <label for="<?php echo esc_attr($unique_id); ?>-court"><?php _e('Search Venue Name', 'turf-booking'); ?></label>
+                                <label for="<?php echo esc_attr($unique_id); ?>-court"><?php _e('Choose Sports', 'turf-booking'); ?></label>
                                 <select id="<?php echo esc_attr($unique_id); ?>-court" class="tb-select-court">
-                                    <option value=""><?php _e('Select a venue', 'turf-booking'); ?></option>
+                                    <option value=""><?php _e('Select a sport', 'turf-booking'); ?></option>
                                     <?php foreach ($courts as $court) : ?>
                                         <option value="<?php echo esc_attr($court->ID); ?>"><?php echo esc_html($court->post_title); ?></option>
                                     <?php endforeach; ?>
@@ -211,7 +211,7 @@ public function courts_shortcode($atts) {
         'category' => '',
         'location' => '',
         'featured' => false,
-        'columns' => 3,
+        'columns' => 4,
         'slider' => true, // New attribute to enable/disable slider
     ), $atts, 'turf_booking_courts');
     
@@ -271,6 +271,12 @@ public function courts_shortcode($atts) {
     ob_start();
     
     if ($courts_query->have_posts()) {
+        // Section header
+        echo '<div class="tb-section-header">';
+        echo '<h2 class="tb-section-title">Book Courts</h2>';
+        echo '<a href="' . esc_url(get_post_type_archive_link('tb_court')) . '" class="tb-view-all">SEE ALL VENUES <i class="feather-chevron-right"></i></a>';
+        echo '</div>';
+        
         // Get column class based on column count
         $column_class = 'tb-col-' . $columns;
         
@@ -300,22 +306,77 @@ public function courts_shortcode($atts) {
         while ($courts_query->have_posts()) {
             $courts_query->the_post();
             
-            if ($need_slider) {
-                echo '<div class="tb-slider-item">';
-                include(TURF_BOOKING_PLUGIN_DIR . 'public/templates/content-court-card.php');
-                echo '</div>';
-            } else {
-                include(TURF_BOOKING_PLUGIN_DIR . 'public/templates/content-court-card.php');
+            // Get required data for each court
+            $court_id = get_the_ID();
+            $court_title = get_the_title();
+            $court_location = get_post_meta($court_id, '_tb_court_address', true);
+            $court_distance = get_post_meta($court_id, '_tb_court_distance', true) ?: rand(0, 5) . '.' . rand(0, 99);
+            $is_featured = get_post_meta($court_id, '_tb_court_featured', true);
+            $permalink = get_permalink();
+            
+            // Get sport type
+            $sport_name = '';
+            $sport_types = get_the_terms($court_id, 'sport_type');
+            if ($sport_types && !is_wp_error($sport_types)) {
+                $sport_name = $sport_types[0]->name;
             }
+            
+            // Generate the card
+            echo '<a href="' . esc_url($permalink) . '" class="tb-venue-card">';
+            
+            // Card image section
+            echo '<div class="tb-venue-image">';
+            if (has_post_thumbnail()) {
+                echo '<img src="' . get_the_post_thumbnail_url(null, 'medium') . '" alt="' . esc_attr($court_title) . '">';
+            } else {
+                echo '<div class="tb-no-image"></div>';
+            }
+            
+            // Sport name tag
+            if (!empty($sport_name)) {
+                echo '<span class="tb-sport-tag">' . esc_html($sport_name) . '</span>';
+            }
+            
+            // Featured badge
+            if ($is_featured) {
+                echo '<span class="tb-featured-badge">FEATURED</span>';
+            }
+            echo '</div>';
+            
+            // Card content section
+            echo '<div class="tb-venue-content">';
+            
+            // Venue title
+            echo '<h3 class="tb-venue-title">' . esc_html($court_title) . '</h3>';
+            
+            // Location with distance
+            echo '<div class="tb-venue-location">';
+            $location_text = '';
+            if (!empty($court_location)) {
+                $location_text = $court_location;
+            } else if ($sport_types && !is_wp_error($sport_types)) {
+                $location_text = 'Sports Block (behind F... ';
+            }
+            
+            if (!empty($location_text)) {
+                echo esc_html($location_text);
+                if ($court_distance) {
+                    echo ' <span class="tb-venue-distance">(~' . $court_distance . ' Kms)</span>';
+                }
+            }
+            echo '</div>';
+            
+            echo '</div>';
+            echo '</a>'; // Close the card and link
         }
         
         echo '</div>'; // Close inner container
         
-        // If using slider, add navigation arrows
+        // If using slider, add navigation arrows - always include these regardless of screen size
         if ($need_slider) {
             echo '<div class="tb-slider-nav">';
-            echo '<button class="tb-slider-prev"><i class="feather-chevron-left"></i></button>';
-            echo '<button class="tb-slider-next"><i class="feather-chevron-right"></i></button>';
+            echo '<button class="tb-slider-prev" id="' . esc_attr($slider_id) . '-prev"><i class="feather-chevron-left"></i></button>';
+            echo '<button class="tb-slider-next" id="' . esc_attr($slider_id) . '-next"><i class="feather-chevron-right"></i></button>';
             echo '</div>';
         }
         
@@ -326,13 +387,14 @@ public function courts_shortcode($atts) {
             ?>
             <script type="text/javascript">
             jQuery(document).ready(function($) {
+                // Initialize the slider
                 $('#<?php echo esc_js($slider_id); ?> .tb-courts-slider').slick({
-                    slidesToShow: 3,
+                    slidesToShow: <?php echo esc_js($columns); ?>,
                     slidesToScroll: 1,
                     arrows: true,
-                    prevArrow: $('#<?php echo esc_js($slider_id); ?> .tb-slider-prev'),
-                    nextArrow: $('#<?php echo esc_js($slider_id); ?> .tb-slider-next'),
-                    dots: false,
+                    prevArrow: $('#<?php echo esc_js($slider_id); ?>-prev'),
+                    nextArrow: $('#<?php echo esc_js($slider_id); ?>-next'),
+                    dots: false, // Never show dots
                     infinite: false,
                     swipe: true,
                     touchMove: true,
@@ -343,16 +405,17 @@ public function courts_shortcode($atts) {
                             settings: {
                                 slidesToShow: 2,
                                 slidesToScroll: 1,
-                                arrows: true
+                                arrows: true,
+                                dots: false
                             }
                         },
                         {
                             breakpoint: 768,
                             settings: {
-                                slidesToShow: 2,
+                                slidesToShow: 1.5, // Show 1.5 cards on mobile
                                 slidesToScroll: 1,
-                                arrows: false,
-                                dots: true,
+                                arrows: true, // Still use arrows on mobile
+                                dots: false, // No dots on mobile
                                 swipe: true,
                                 touchMove: true
                             }
@@ -360,31 +423,161 @@ public function courts_shortcode($atts) {
                         {
                             breakpoint: 576,
                             settings: {
-                                slidesToShow: 1,
+                                slidesToShow: 1.5, // Show 1.5 cards on mobile
                                 slidesToScroll: 1,
-                                arrows: false,
-                                dots: true,
+                                arrows: true, // Still use arrows on mobile
+                                dots: false, // No dots on mobile
                                 centerMode: false,
-                                variableWidth: false,
                                 swipe: true,
                                 touchMove: true
                             }
                         }
                     ]
                 });
+                
+                // Ensure arrows work regardless of screen size
+                $('#<?php echo esc_js($slider_id); ?>-prev').on('click', function(e) {
+                    e.preventDefault();
+                    $('#<?php echo esc_js($slider_id); ?> .tb-courts-slider').slick('slickPrev');
+                });
+                
+                $('#<?php echo esc_js($slider_id); ?>-next').on('click', function(e) {
+                    e.preventDefault();
+                    $('#<?php echo esc_js($slider_id); ?> .tb-courts-slider').slick('slickNext');
+                });
             });
             </script>
             
             <style>
+            /* Section header */
+            .tb-section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+            }
+            
+   
+            .tb-section-title {
+                font-size: 28px;
+                font-weight: 600;
+                color: #333;
+                margin: 0;
+            }
+            
+            .tb-view-all {
+                color: #4CAF50;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                font-weight: 500;
+            }
+            
+            .tb-view-all i {
+                margin-left: 6px;
+            }
+            
+            /* Venue cards */
+            .tb-venue-card {
+                background-color: #fff;
+                border-radius: 10px;
+                overflow: hidden;
+                box-shadow: 0 0 #0000,0 0 #0000,0px 10px 15px rgba(0,0,0,.1),0px 4px 6px rgba(0,0,0,.05);
+                margin-bottom: 15px;
+                transition: transform 0.3s ease;
+                display: block;
+                text-decoration: none;
+                color: inherit;
+                margin-right: 12px; /* Add gap between cards */
+            }
+            
+            .tb-venue-card:hover {
+                transform: translateY(-5px);
+            }
+            
+            .tb-venue-image {
+                position: relative;
+                height: 180px;
+                overflow: hidden;
+            }
+            
+            .tb-venue-image img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            
+            .tb-sport-tag {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    background-color: rgb(0 0 0 / 0.5);
+    color: #fff;
+    padding: 1px 10px;
+    border-radius: 8px;
+    border: 1px solid #fff;
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom-color: #e2e2e29e;
+    border-top-color: #e2e2e29e;
+    border-left-color: #dedede63;
+    z-index: 2;
+}
+            
+            .tb-featured-badge {
+                position: absolute;
+                bottom: 15px;
+                right: 15px;
+                background-color: rgba(0,0,0,0.7);
+                color: #fff;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 500;
+                z-index: 2;
+            }
+            
+            .tb-venue-content {
+                padding: 15px;
+            }
+            
+            .tb-venue-title {
+                font-size: 15px;
+                font-weight: 600;
+                margin: 0 0 8px;
+                color: #333;
+                white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+            }
+            
+            .tb-venue-location {
+                font-size: 14px;
+                color: #666;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .tb-venue-distance {
+                color: #999;
+            }
+            
+            /* Slider styling */
             .tb-courts-slider-container {
                 position: relative;
                 padding: 0;
                 overflow: hidden;
             }
             
-            .slick-track {
-    column-gap: 15px;
-}
+            .tb-courts-slider {
+                margin: 0 -7.5px; /* Adjust for card margin */
+            }
+            
+            /* Hide dots completely */
+            .slick-dots {
+                display: none !important;
+            }
             
             .tb-slider-nav button {
                 position: absolute;
@@ -395,12 +588,12 @@ public function courts_shortcode($atts) {
                 border-radius: 50%;
                 width: 40px;
                 height: 40px;
-                padding: 20px !important;
+                padding: 0 !important;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 cursor: pointer;
-                z-index: 10;
+                z-index: 1;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.1);
                 transition: all 0.3s ease;
             }
@@ -420,26 +613,39 @@ public function courts_shortcode($atts) {
             }
             
             .tb-slider-prev {
-                left: -10px;
+                left: 10px;
             }
             
             .tb-slider-next {
-                right: -10px;
+                right: 10px;
             }
-             @media (min-width: 768px) {
-            .slick-initialized .slick-slide {
-    padding: 0 8px;
-}}
+                    .tb-courts-slider-container .slick-track {
+    padding: 10px;
+}
+
             /* Mobile-specific styles */
             @media (max-width: 768px) {
+                        .tb-courts-slider-container .slick-track {
+    padding: 0px;
+}
+
+                .tb-venue-image {
+    height: auto;
+            max-height: 132px;
+}
                 .tb-slider-nav {
-                    display: none;
+                    display: block; /* Always show navigation on mobile */
+                }
+                
+                .tb-slider-nav button {
+                    width: 36px;
+                    height: 36px;
                 }
                 
                 .tb-courts-slider-container {
-                    padding: 0;
-                    margin: 0 15px;
-                    width: calc(100% - 30px);
+                           padding: 0;
+        margin: 0;
+        width: 100%;
                 }
                 
                 .tb-courts-slider {
@@ -449,32 +655,37 @@ public function courts_shortcode($atts) {
                 
                 .tb-courts-slider .slick-list {
                     overflow: visible !important;
+                    padding-right: 30px; /* Add extra padding for the half card */
                 }
+                
+                .tb-venue-card {
+                    margin-right: 10px; /* Reduce gap on mobile */
+                }
+                
                 .slick-track:before, .slick-track:after {
                     display: none !important;
                 }
+                
                 .tb-courts-slider .slick-track {
                     display: flex;
                 }
                 
-                .tb-courts-slider .slick-dots {
-                    bottom: -25px;
+                /* Make sure the arrows work on mobile */
+                .tb-slider-prev {
+                    left: -5px;
+                    z-index: 20;
                 }
                 
-                .tb-courts-slider .slick-dots li button:before {
-                    font-size: 10px;
-                }
-                
-                .tb-slider-item {
-                    height: auto;
-                    width: 100% !important;
+                .tb-slider-next {
+                    right: -5px;
+                    z-index: 20;
                 }
             }
             </style>
             <?php
         }
     } else {
-        echo '<p>' . __('No courts found.', 'turf-booking') . '</p>';
+        echo '<p>' . __('No venues found.', 'turf-booking') . '</p>';
     }
     
     // Reset post data

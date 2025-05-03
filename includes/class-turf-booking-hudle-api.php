@@ -183,122 +183,140 @@ class Turf_Booking_Hudle_API {
      * @param int $booking_id
      * @return bool|WP_Error
      */
-    public function sync_booking_to_hudle($booking_id) {
-        $this->log_debug("Attempting to sync booking #$booking_id to Hudle");
-        
-        // Get booking details
-        $court_id = get_post_meta($booking_id, '_tb_booking_court_id', true);
-        
-        if (!$this->court_has_hudle_integration($court_id)) {
-            $this->log_debug("Court #$court_id is not integrated with Hudle, skipping sync");
-            return false;
-        }
-        
-        $facility_id = get_post_meta($court_id, '_tb_hudle_facility_id', true);
-        $activity_id = get_post_meta($court_id, '_tb_hudle_activity_id', true);
-        $date = get_post_meta($booking_id, '_tb_booking_date', true);
-        $time_from = get_post_meta($booking_id, '_tb_booking_time_from', true);
-        $time_to = get_post_meta($booking_id, '_tb_booking_time_to', true);
-        $user_name = get_post_meta($booking_id, '_tb_booking_user_name', true);
-        $user_email = get_post_meta($booking_id, '_tb_booking_user_email', true);
-        $user_phone = get_post_meta($booking_id, '_tb_booking_user_phone', true);
-        
-        $this->log_debug("Booking details: Court ID: $court_id, Facility ID: $facility_id, Date: $date, Time: $time_from - $time_to");
-        
-        // Generate timestamps for each 30-minute slot
-        $start_datetime = new DateTime($date . ' ' . $time_from);
-        $end_datetime = new DateTime($date . ' ' . $time_to);
-        
-        $current_time = clone $start_datetime;
-        $timestamps = array();
-        
-        while ($current_time < $end_datetime) {
-            $timestamps[] = $current_time->format('Y-m-d H:i:s');
-            $current_time->add(new DateInterval('PT30M')); // Add 30 minutes
-        }
-        
-        if (empty($timestamps)) {
-            $this->log_error("No valid timestamps generated for booking #$booking_id");
-            return new WP_Error('invalid_time', __('Could not generate valid time slots', 'turf-booking'));
-        }
-        
-        $this->log_debug("Generated " . count($timestamps) . " timestamps for booking");
-        
-        // Build the request body
-        $body = array();
-        
-        // Add timestamps
-        foreach ($timestamps as $index => $timestamp) {
-            $body["start_timestamps[$index]"] = $timestamp;
-        }
-        
-        // Add user details
-        $body['user_details[name]'] = $user_name;
-        $body['user_details[email]'] = $user_email;
-        $body['user_details[phone_number]'] = $user_phone;
-        
-        // Add date of birth (required by Hudle)
-        $body['user_details[date_of_birth]'] = '1990-01-01'; // Default value
-        
-        // Add note
-        $body['note'] = sprintf(__('Booking #%d from District9', 'turf-booking'), $booking_id);
-        
-        // Add activity id if available
-        if (!empty($activity_id)) {
-            $body['activity_id'] = $activity_id;
-        }
-        
-        $url = sprintf(
-            '%s/venues/%s/facilities/%s/bookings',
-            $this->api_base_url,
-            $this->venue_id,
-            $facility_id
-        );
-        
-        $this->log_debug("Sending booking to Hudle: $url with data: " . json_encode($body));
-        
-        $response = wp_remote_post($url, array(
-            'method' => 'POST',
-            'timeout' => 45,
-            'redirection' => 5,
-            'httpversion' => '1.0',
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $this->api_token,
-                'Content-Type' => 'application/x-www-form-urlencoded'
-            ),
-            'body' => $body
-        ));
-        
-        if (is_wp_error($response)) {
-            $this->log_error('Error creating booking in Hudle: ' . $response->get_error_message());
-            return $response;
-        }
-        
-        $response_body = wp_remote_retrieve_body($response);
-        $this->log_debug("Hudle booking API response: $response_body");
-        
-        $body = json_decode($response_body, true);
-        $status_code = wp_remote_retrieve_response_code($response);
-        
-        if ($status_code !== 201 || !isset($body['success']) || $body['success'] !== true) {
-            $error_message = isset($body['message']) ? $body['message'] : 'Unknown error';
-            $this->log_error('Error response from Hudle: ' . $error_message);
-            return new WP_Error('api_error', $error_message);
-        }
-        
-        // Save Hudle booking details to our booking
-        if (isset($body['data']['id'])) {
-            update_post_meta($booking_id, '_tb_hudle_booking_id', $body['data']['id']);
-        }
-        
-        if (isset($body['data']['reference_id'])) {
-            update_post_meta($booking_id, '_tb_hudle_reference_id', $body['data']['reference_id']);
-        }
-        
-        $this->log_debug('Successfully created booking in Hudle for booking #' . $booking_id);
-        
-        return true;
+public function sync_booking_to_hudle($booking_id) {
+    $this->log_debug("Attempting to sync booking #$booking_id to Hudle using cURL");
+    
+    // Get booking details
+    $court_id = get_post_meta($booking_id, '_tb_booking_court_id', true);
+    
+    if (!$this->court_has_hudle_integration($court_id)) {
+        $this->log_debug("Court #$court_id is not integrated with Hudle, skipping sync");
+        return false;
     }
+    
+    $facility_id = get_post_meta($court_id, '_tb_hudle_facility_id', true);
+    $activity_id = get_post_meta($court_id, '_tb_hudle_activity_id', true);
+    $date = get_post_meta($booking_id, '_tb_booking_date', true);
+    $time_from = get_post_meta($booking_id, '_tb_booking_time_from', true);
+    $time_to = get_post_meta($booking_id, '_tb_booking_time_to', true);
+    $user_name = get_post_meta($booking_id, '_tb_booking_user_name', true);
+    $user_email = get_post_meta($booking_id, '_tb_booking_user_email', true);
+    $user_phone = get_post_meta($booking_id, '_tb_booking_user_phone', true);
+    
+    $this->log_debug("Booking details: Court ID: $court_id, Facility ID: $facility_id, Date: $date, Time: $time_from - $time_to");
+    
+    // Generate timestamps for each 30-minute slot
+    $start_datetime = new DateTime($date . ' ' . $time_from);
+    $end_datetime = new DateTime($date . ' ' . $time_to);
+    
+    $current_time = clone $start_datetime;
+    $timestamps = array();
+    
+    while ($current_time < $end_datetime) {
+        $timestamps[] = $current_time->format('Y-m-d H:i:s');
+        $current_time->add(new DateInterval('PT30M')); // Add 30 minutes
+    }
+    
+    if (empty($timestamps)) {
+        $this->log_error("No valid timestamps generated for booking #$booking_id");
+        return new WP_Error('invalid_time', __('Could not generate valid time slots', 'turf-booking'));
+    }
+    
+    $this->log_debug("Generated " . count($timestamps) . " timestamps for booking");
+    
+    // Build the URL for the Hudle API
+    $url = sprintf(
+        '%s/venues/%s/facilities/%s/bookings',
+        $this->api_base_url,
+        $this->venue_id,
+        $facility_id
+    );
+    
+    $this->log_debug("Sending booking to Hudle: $url");
+    
+    // Initialize cURL
+    $curl = curl_init();
+    
+    // Create form data array for cURL
+    $post_fields = array();
+    
+    // Add timestamps
+    foreach ($timestamps as $index => $timestamp) {
+        $post_fields["start_timestamps[$index]"] = $timestamp;
+    }
+    
+    // Add user details
+    $post_fields['user_details[name]'] = $user_name;
+    $post_fields['user_details[email]'] = $user_email;
+    $post_fields['user_details[phone_number]'] = $user_phone;
+    $post_fields['user_details[date_of_birth]'] = '2000-01-01'; // Default value
+    
+    // Add note
+    $post_fields['note'] = sprintf(__('Booking #%d from %s', 'turf-booking'), $booking_id, get_bloginfo('name'));
+    
+    // Add activity id if available
+    if (!empty($activity_id)) {
+        $post_fields['activity_id'] = $activity_id;
+    }
+    
+    $this->log_debug("cURL post fields: " . print_r($post_fields, true));
+    
+    // Set cURL options
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => '',
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => 'POST',
+        CURLOPT_POSTFIELDS => $post_fields,
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer ' . $this->api_token,
+            'Content-Type: multipart/form-data'
+        ),
+    ));
+    
+    // Execute cURL request
+    $response = curl_exec($curl);
+    $err = curl_error($curl);
+    $status_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    
+    // Close cURL session
+    curl_close($curl);
+    
+    // Log the complete response for debugging
+    $this->log_debug("Hudle API response status code: $status_code");
+    $this->log_debug("Hudle API raw response: $response");
+    
+    if ($err) {
+        $this->log_error('cURL Error: ' . $err);
+        return new WP_Error('api_error', $err);
+    }
+    
+    // Process the response
+    $body = json_decode($response, true);
+    
+    if ($status_code !== 201 || !isset($body['success']) || $body['success'] !== true) {
+        $error_message = isset($body['message']) ? $body['message'] : 'Unknown error';
+        $this->log_error('Error response from Hudle: ' . $error_message);
+        return new WP_Error('api_error', $error_message);
+    }
+    
+   if (isset($body['data']['id'])) {
+   update_post_meta($booking_id, '_tb_hudle_booking_id', $body['data']['id']);
+}
+
+if (isset($body['data']['reference_id'])) {
+   update_post_meta($booking_id, '_tb_hudle_reference_id', $body['data']['reference_id']);
+}
+
+$this->log_debug('Successfully created booking in Hudle for booking #' . $booking_id);
+
+return true;
+
+}
     
     /**
      * Log error message

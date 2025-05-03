@@ -34,12 +34,6 @@
         }
     });
 
-
-
-
-    
-
-
     /**
      * Initialize the booking system functionality
      */
@@ -312,7 +306,7 @@
      * Initialize user dashboard functionality
      */
     function initUserDashboard() {
-        if (!$('.tb-dashboard-container').length) {
+        if (!$('.tb-dashboard-wrapper').length) {
             return;
         }
 
@@ -349,57 +343,48 @@
             console.warn('Error accessing session storage:', e);
         }
         
-        // Handle booking cancellation
-        $(document).on('click', '.tb-cancel-booking', function(e) {
-            e.preventDefault();
+        // Enhanced profile form handling
+        $('.tb-profile-form').on('submit', function(e) {
+            // We'll let the form submit normally, but add some visual feedback
+            var $submitButton = $(this).find('button[type="submit"]');
+            $submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
             
-            var bookingId = $(this).data('booking-id');
-            if (!bookingId) return;
+            // Clear any existing messages
+            $('.tb-form-message').remove();
             
-            if (window.confirm(params.confirm_cancel)) {
-                $.ajax({
-                    url: params.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'tb_dashboard_actions',
-                        dashboard_action: 'cancel_booking',
-                        booking_id: bookingId,
-                        nonce: params.dashboard_nonce
-                    },
-                    beforeSend: function() {
-                        $('.tb-dashboard-message').remove();
-                        $('.tb-dashboard-container').prepend('<div class="tb-dashboard-message tb-loading">' + params.processing + '</div>');
-                    },
-                    success: function(response) {
-                        $('.tb-dashboard-message').remove();
-                        
-                        if (response && response.success) {
-                            $('.tb-dashboard-container').prepend('<div class="tb-dashboard-message tb-success">' + 
-                                (response.data && response.data.message ? response.data.message : 'Booking cancelled') + '</div>');
-                            
-                            // Reload bookings
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1000);
-                        } else {
-                            $('.tb-dashboard-container').prepend('<div class="tb-dashboard-message tb-error">' + 
-                                (response.data && response.data.message ? response.data.message : params.ajax_error) + '</div>');
-                        }
-                    },
-                    error: function() {
-                        $('.tb-dashboard-message').remove();
-                        $('.tb-dashboard-container').prepend('<div class="tb-dashboard-message tb-error">' + params.ajax_error + '</div>');
-                    }
-                });
+            // Set display_name based on first and last name
+            var firstName = $('#first_name').val();
+            var lastName = $('#last_name').val();
+            if (firstName || lastName) {
+                $('#display_name').val((firstName + ' ' + lastName).trim());
             }
-        });
-
-        // Profile form submission
-        $('.tb-profile-form').on('submit', function() {
-            // Form submission happens through regular form action
-            // This is just for UI enhancements
-            $('.tb-profile-response').remove();
-            $(this).find('button[type="submit"]').prop('disabled', true).after('<span class="tb-loading-spinner"></span>');
+            
+            // Additional validation
+            var valid = true;
+            
+            // Email validation
+            var email = $('#email').val();
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                e.preventDefault();
+                $('#email').after('<p class="tb-form-message tb-error">Please enter a valid email address.</p>');
+                valid = false;
+            }
+            
+            // Password validation
+            var currentPassword = $('#current_password').val();
+            var newPassword = $('#new_password').val();
+            var confirmPassword = $('#confirm_password').val();
+            
+            if (newPassword && newPassword !== confirmPassword) {
+                e.preventDefault();
+                $('#confirm_password').after('<p class="tb-form-message tb-error">Passwords do not match.</p>');
+                valid = false;
+            }
+            
+            // If validation fails, reset the button
+            if (!valid) {
+                $submitButton.prop('disabled', false).html('Save changes');
+            }
         });
         
         // Password strength meter
@@ -472,265 +457,353 @@
                     .html(params.passwords_not_match || 'Passwords do not match');
             }
         });
-    }
 
-    /**
-     * Initialize rating system for reviews
-     */
-    function initReviewSystem() {
-        if (!$('.tb-review-form').length) {
-            return;
-        }
-
-        // Star rating selection
-        var $ratingStars = $('.tb-rating-star');
-        if (!$ratingStars.length) return;
-        
-        $ratingStars.on('mouseover', function() {
-            var rating = $(this).data('rating');
-            if (!rating) return;
+        // *** FIX 1: Sort and Filter Functionality ***
+        // Handle date filter button
+        $('.tb-date-filter button').on('click', function() {
+            // Create a date picker dropdown when the filter button is clicked
+            var $container = $('<div class="tb-date-picker-container"></div>');
+            var $datePicker = $('<input type="text" class="tb-date-filter-input" />');
             
-            // Highlight stars
-            $ratingStars.each(function() {
-                if ($(this).data('rating') <= rating) {
-                    $(this).find('i').removeClass('far').addClass('fas');
-                } else {
-                    $(this).find('i').removeClass('fas').addClass('far');
+            // Remove any existing date picker
+            $('.tb-date-picker-container').remove();
+            
+            // Add the new date picker after the button
+            $(this).after($container);
+            $container.append($datePicker);
+            
+            // Initialize jQuery UI datepicker
+            $datePicker.datepicker({
+                dateFormat: 'yy-mm-dd',
+                onSelect: function(dateText) {
+                    // Filter bookings by the selected date
+                    filterBookingsByDate(dateText);
+                    // Remove the date picker after selection
+                    $container.remove();
                 }
             });
+            
+            // Show the datepicker
+            $datePicker.datepicker('show');
         });
-        
-        $ratingStars.on('mouseout', function() {
-            if ($('#tb-review-rating').val()) {
-                // If a rating is already selected, maintain that selection
-                var selectedRating = parseInt($('#tb-review-rating').val());
-                $ratingStars.each(function() {
-                    if ($(this).data('rating') <= selectedRating) {
-                        $(this).find('i').removeClass('far').addClass('fas');
-                    } else {
-                        $(this).find('i').removeClass('fas').addClass('far');
+
+        // Function to filter bookings by date
+        function filterBookingsByDate(selectedDate) {
+            // Get all booking rows
+            var $bookingRows = $('.tb-table-row');
+            
+            if (!selectedDate) {
+                // If no date selected, show all
+                $bookingRows.show();
+                return;
+            }
+            
+            // Filter the booking rows
+            $bookingRows.each(function() {
+                var rowDate = $(this).find('.tb-date').text().trim();
+                // Convert display date to comparable format if needed
+                var compareDate = new Date(rowDate);
+                var selectedDateObj = new Date(selectedDate);
+                
+                // Check if dates match (ignoring time)
+                if (compareDate.toDateString() === selectedDateObj.toDateString()) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+            
+            // Show message if no results
+            if ($bookingRows.filter(':visible').length === 0) {
+                // If no table is visible, append a message
+                var $currentTab = $('.tb-tab-pane.active');
+                if ($currentTab.find('.tb-no-filtered-bookings').length === 0) {
+                    $currentTab.append('<div class="tb-no-filtered-bookings"><p>No bookings found for the selected date.</p></div>');
+                }
+            } else {
+                $('.tb-no-filtered-bookings').remove();
+            }
+        }
+
+        // Handle filter options button
+        $('.tb-filter-options button').on('click', function() {
+            // Create a filter dropdown
+            var $container = $('<div class="tb-filter-dropdown"></div>');
+            var $filterSelect = $(
+                '<select class="tb-filter-select">' +
+                '<option value="all">All Statuses</option>' +
+                '<option value="pending">Pending</option>' +
+                '<option value="confirmed">Confirmed</option>' +
+                '<option value="completed">Completed</option>' +
+                '<option value="cancelled">Cancelled</option>' +
+                '</select>'
+            );
+            
+            // Remove any existing filter dropdown
+            $('.tb-filter-dropdown').remove();
+            
+            // Add the new filter dropdown after the button
+            $(this).after($container);
+            $container.append($filterSelect);
+            
+            // Add change event to the filter dropdown
+            $filterSelect.on('change', function() {
+                var status = $(this).val();
+                filterBookingsByStatus(status);
+            });
+            
+            // Focus the dropdown
+            $filterSelect.focus();
+        });
+
+        // Function to filter bookings by status
+        function filterBookingsByStatus(status) {
+            // Get all booking rows
+            var $bookingRows = $('.tb-table-row');
+            
+            if (status === 'all') {
+                // If 'all' selected, show all rows
+                $bookingRows.show();
+                $('.tb-no-filtered-bookings').remove();
+                return;
+            }
+            
+            // Filter the booking rows
+            $bookingRows.each(function() {
+                var rowStatus = $(this).find('.tb-status .tb-status-badge').text().trim().toLowerCase();
+                if (rowStatus === status) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+            
+            // Show message if no results
+            if ($bookingRows.filter(':visible').length === 0) {
+                var $currentTab = $('.tb-tab-pane.active');
+                if ($currentTab.find('.tb-no-filtered-bookings').length === 0) {
+                    $currentTab.append('<div class="tb-no-filtered-bookings"><p>No bookings found with the selected status.</p></div>');
+                }
+            } else {
+                $('.tb-no-filtered-bookings').remove();
+            }
+        }
+
+        // Add a click outside handler to close dropdowns when clicking elsewhere
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.tb-date-filter, .tb-filter-options, .tb-date-picker-container, .tb-filter-dropdown').length) {
+                $('.tb-date-picker-container, .tb-filter-dropdown').remove();
+            }
+        });
+
+        // *** FIX 2: Cancel Booking Functionality ***
+        // Handle booking cancellation through the dropdown menu
+        $(document).on('click', '.tb-dropdown-item.tb-text-danger', function(e) {
+            e.preventDefault();
+            
+            var bookingId = $(this).closest('.tb-table-row').data('booking-id');
+            if (!bookingId) {
+                // Try to extract from href if not in data attribute
+                var href = $(this).attr('href');
+                if (href) {
+                    var match = href.match(/id=(\d+)/);
+                    if (match && match[1]) {
+                        bookingId = match[1];
+                    }
+                }
+            }
+            
+            if (!bookingId) {
+                console.error('Booking ID not found');
+                return;
+            }
+            
+            if (window.confirm(params.confirm_cancel || 'Are you sure you want to cancel this booking?')) {
+                // Add a loading indicator
+                var $row = $(this).closest('.tb-table-row');
+                $row.addClass('tb-loading-row');
+                $(this).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+                
+                // AJAX request to cancel booking
+                $.ajax({
+                    url: params.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'tb_dashboard_actions',
+                        dashboard_action: 'cancel_booking',
+                        booking_id: bookingId,
+                        nonce: params.dashboard_nonce
+                    },
+                    success: function(response) {
+                        $row.removeClass('tb-loading-row');
+                        
+                        if (response && response.success) {
+                            // Show success message
+                            $('.tb-bookings-content').prepend(
+                                '<div class="tb-message tb-success">' +
+                                (response.data && response.data.message ? response.data.message : 'Booking cancelled successfully.') +
+                                '</div>'
+                            );
+                            
+                            // Update booking status in the UI
+                            $row.find('.tb-status .tb-status-badge')
+                                .removeClass('tb-status-pending tb-status-confirmed')
+                                .addClass('tb-status-cancelled')
+                                .text('Cancelled');
+                            
+                            // Move to cancelled tab
+                            setTimeout(function() {
+                                $('.tb-booking-status-tabs li a[data-tab="cancelled"]').trigger('click');
+                                // Refresh the page after a delay to update all data
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1000);
+                            }, 1000);
+                        } else {
+                            // Show error message
+                            $('.tb-bookings-content').prepend(
+                                '<div class="tb-message tb-error">' +
+                                (response.data && response.data.message ? response.data.message : 'Failed to cancel booking. Please try again.') +
+                                '</div>'
+                            );
+                            // Reset cancel button
+                            $(this).html('<i class="fas fa-times-circle"></i> Cancel Booking');
+                        }
+                    },
+                    error: function() {
+                        $row.removeClass('tb-loading-row');
+                        
+                        // Show error message
+                        $('.tb-bookings-content').prepend(
+                            '<div class="tb-message tb-error">An error occurred. Please try again.</div>'
+                        );
+                        
+                        // Reset cancel button
+                        $(this).html('<i class="fas fa-times-circle"></i> Cancel Booking');
                     }
                 });
-            } else {
-                // Otherwise reset to empty stars
-                $ratingStars.find('i').removeClass('fas').addClass('far');
             }
-        });
-        
-        $ratingStars.on('click', function() {
-            var rating = $(this).data('rating');
-            if (!rating) return;
-            
-            // Set rating value
-            $('#tb-review-rating').val(rating);
-            
-            // Update selected stars
-            $ratingStars.each(function() {
-                if ($(this).data('rating') <= rating) {
-                    $(this).find('i').removeClass('far').addClass('fas');
-                } else {
-                    $(this).find('i').removeClass('fas').addClass('far');
-                }
-            });
         });
 
-        // AJAX form submission
-        $('#tb-review-form').on('submit', function(e) {
+        // Also fix the cancel booking button on the booking details page
+        $(document).on('click', '.tb-booking-actions .tb-button-danger', function(e) {
             e.preventDefault();
             
-            var $form = $(this);
-            var $submitButton = $('#tb-submit-review');
-            var $response = $('#tb-review-response');
-            var rating = $('#tb-review-rating').val();
-            var content = $('#tb-review-content').val();
-            
-            // Validate input
-            if (!rating) {
-                $response.html('<div class="tb-error-message">Please select a rating.</div>').show();
+            var href = $(this).attr('href');
+            if (!href || !href.includes('action=cancel-booking')) {
                 return;
             }
             
-            if (!content.trim()) {
-                $response.html('<div class="tb-error-message">Please write a review.</div>').show();
-                return;
+            if (window.confirm(params.confirm_cancel || 'Are you sure you want to cancel this booking?')) {
+                // Use direct location change since this is using server-side processing
+                window.location.href = href;
             }
-            
-            // Disable submit button and show loading
-            $submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Submitting...');
-            $response.hide();
-            
-            // Send AJAX request
-            $.ajax({
-                url: params.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'tb_submit_review',
-                    court_id: $form.find('input[name="court_id"]').val(),
-                    rating: rating,
-                    content: content,
-                    nonce: $form.find('input[name="tb_review_nonce"]').val()
-                },
-                success: function(response) {
-                    $submitButton.prop('disabled', false).html('Submit Review');
-                    
-                    if (response.success) {
-                        $response.html('<div class="tb-success-message">' + response.data.message + '</div>').show();
-                        
-                        // Clear form
-                        $('#tb-review-rating').val('');
-                        $('#tb-review-content').val('');
-                        $ratingStars.find('i').removeClass('fas').addClass('far');
-                        
-                        // Reload page after a delay to show the new review
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        $response.html('<div class="tb-error-message">' + response.data.message + '</div>').show();
+        });
+
+        // Add data attributes to all booking rows for easier selection
+        $('.tb-table-row').each(function() {
+            // Extract booking ID from actions
+            var $cancelLink = $(this).find('.tb-dropdown-item.tb-text-danger');
+            if ($cancelLink.length) {
+                var href = $cancelLink.attr('href');
+                if (href) {
+                    var match = href.match(/id=(\d+)/);
+                    if (match && match[1]) {
+                        $(this).attr('data-booking-id', match[1]);
                     }
-                },
-                error: function() {
-                    $submitButton.prop('disabled', false).html('Submit Review');
-                    $response.html('<div class="tb-error-message">An error occurred. Please try again.</div>').show();
                 }
-            });
+            }
         });
-    }
 
-    /**
-     * Setup Font Awesome if needed
-     */
-    function setupFontAwesome() {
-        // Check if Font Awesome is already loaded
-        if (typeof FontAwesome !== 'undefined' || $('.fa, .fas, .far, .fab').length > 0) {
-            return;
-        }
+        // *** FIX 3: Profile Image Upload Functionality ***
+        // Profile image upload button
+        $('#tb-upload-image-btn').on('click', function(e) {
+            e.preventDefault();
+            $('#tb-profile-image-input').trigger('click');
+        });
         
-        // Add Font Awesome from CDN if not loaded
-        $('head').append('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />');
-    }
-
-    /**
-     * Escape HTML special characters
-     * 
-     * @param {string} unsafe The unsafe string
-     * @return {string} Safe HTML string
-     */
-    function escapeHtml(unsafe) {
-        if (typeof unsafe !== 'string') return '';
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-
-
-
-
-
-    $(function() {
-        // Handle tab switching in bookings
-        $('.tb-booking-status-tabs li a').on('click', function(e) {
+        // Handle file selection
+        $('#tb-profile-image-input').on('change', function() {
+            if (this.files && this.files[0]) {
+                // Show a preview of the selected image
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#tb-profile-image-preview').attr('src', e.target.result);
+                }
+                reader.readAsDataURL(this.files[0]);
+                
+                // Submit the form via AJAX
+                var formData = new FormData($('#tb-profile-image-form')[0]);
+                
+                $.ajax({
+                    url: params.ajax_url,
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    beforeSend: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-loading">Uploading image...</p>');
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#tb-image-upload-messages').html('<p class="tb-success">' + response.data.message + '</p>');
+                            // Update image if URL is returned
+                            if (response.data.image_url) {
+                                $('#tb-profile-image-preview').attr('src', response.data.image_url);
+                            }
+                        } else {
+                            $('#tb-image-upload-messages').html('<p class="tb-error">' + (response.data && response.data.message ? response.data.message : 'Error uploading image.') + '</p>');
+                        }
+                    },
+                    error: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-error">Error uploading image. Please try again.</p>');
+                    }
+                });
+            }
+        });
+        
+        // Remove profile image
+        $('#tb-remove-image-btn').on('click', function(e) {
             e.preventDefault();
             
-            var tabId = $(this).attr('href').substring(1);
-            
-            // Update active tab
-            $('.tb-booking-status-tabs li').removeClass('active');
-            $(this).parent().addClass('active');
-            
-            // Show selected tab content
-            $('.tb-tab-pane').removeClass('active');
-            $('#' + tabId).addClass('active');
-            
-            // Save active tab in session storage
-            try {
-                sessionStorage.setItem('tb_active_booking_tab', tabId);
-            } catch (e) {
-                console.warn('Session storage not available');
+            if (confirm('Are you sure you want to remove your profile picture?')) {
+                $.ajax({
+                    url: params.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'tb_profile_image_remove',
+                        nonce: $('#tb-profile-image-form input[name="nonce"]').val()
+                    },
+                    beforeSend: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-loading">Removing image...</p>');
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#tb-image-upload-messages').html('<p class="tb-success">' + response.data.message + '</p>');
+                            // Reset to default avatar
+                            var defaultAvatar = $('#tb-profile-image-preview').data('default') || $('#tb-profile-image-preview').attr('src');
+                            $('#tb-profile-image-preview').attr('src', defaultAvatar);
+                        } else {
+                            $('#tb-image-upload-messages').html('<p class="tb-error">' + (response.data && response.data.message ? response.data.message : 'Error removing image.') + '</p>');
+                        }
+                    },
+                    error: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-error">Error removing image. Please try again.</p>');
+                    }
+                });
             }
         });
-        
-        // Load active tab from session storage
-        try {
-            var activeTab = sessionStorage.getItem('tb_active_booking_tab');
-            if (activeTab && $('.tb-booking-status-tabs li a[href="#' + activeTab + '"]').length) {
-                $('.tb-booking-status-tabs li a[href="#' + activeTab + '"]').trigger('click');
-            }
-        } catch (e) {
-            console.warn('Error accessing session storage');
-        }
-        
-        // Handle section tabs (Upcoming Bookings / Recent Bookings)
-        $('.tb-section-tabs .tb-tab').on('click', function() {
-            $('.tb-section-tabs .tb-tab').removeClass('active');
-            $(this).addClass('active');
-            
-            // Here you would typically show/hide corresponding content
-            // But since this is just UI in screenshots, we're not implementing full functionality
-        });
-        
-        // Profile picture upload button (visual only, no actual upload)
-        $('.tb-upload-btn').on('click', function() {
-            alert('This is a visual demo. File upload functionality would be implemented here.');
-        });
-        
-        // Password strength meter
-        $('#new_password').on('keyup', function() {
-            var password = $(this).val();
-            var $meter = $('#password-strength');
-            
-            if (!password || !$meter.length) {
-                $meter.hide();
-                return;
-            }
-            
-            // Calculate password strength
-            var strength = 0;
-            
-            // Length check
-            if (password.length >= 8) strength += 1;
-            
-            // Contains lowercase and uppercase
-            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 1;
-            
-            // Contains numbers
-            if (/\d/.test(password)) strength += 1;
-            
-            // Contains special characters
-            if (/[^a-zA-Z\d]/.test(password)) strength += 1;
-            
-            // Show strength meter
-            $meter.show();
-            
-            if (strength <= 1) {
-                $meter.removeClass().addClass('tb-password-weak').text('Weak');
-            } else if (strength === 2) {
-                $meter.removeClass().addClass('tb-password-medium').text('Medium');
-            } else if (strength >= 3) {
-                $meter.removeClass().addClass('tb-password-strong').text('Strong');
-            }
-        });
-        
-         $('.tb-booking-tab').on('click', function() {
-        $('.tb-booking-tab').removeClass('active');
-        $(this).addClass('active');
-        
-        // Here you would typically also show/hide corresponding content
-        // For example:
-        // var tabId = $(this).data('tab-id');
-        // $('.tb-bookings-content').hide();
-        // $('#' + tabId).show();
+
+       // Mobile sidebar toggle
+       $('.tb-mobile-sidebar-toggle').on('click', function() {
+        $('.tb-sidebar').toggleClass('active');
     });
     
-    // Search functionality
+    // Search functionality for bookings
     $('.tb-search-input').on('keyup', function() {
         var searchText = $(this).val().toLowerCase();
         
-        $('.tb-booking-card').each(function() {
+        $('.tb-booking-card, .tb-table-row').each(function() {
             var cardText = $(this).text().toLowerCase();
             if (cardText.indexOf(searchText) > -1) {
                 $(this).show();
@@ -738,43 +811,194 @@
                 $(this).hide();
             }
         });
-    });
-    
-    // Filter dropdown
-    $('.tb-filter-select').on('change', function() {
-        var filterValue = $(this).val();
         
-        if (filterValue === 'all') {
-            $('.tb-booking-card').show();
+        // Show no results message if needed
+        var $currentTab = $('.tb-tab-pane.active');
+        if ($currentTab.find('.tb-table-row:visible, .tb-booking-card:visible').length === 0) {
+            if ($currentTab.find('.tb-no-search-results').length === 0) {
+                $currentTab.append('<div class="tb-no-search-results"><p>No bookings found matching your search.</p></div>');
+            }
         } else {
-            $('.tb-booking-card').hide();
-            $('.tb-booking-card[data-status="' + filterValue + '"]').show();
+            $('.tb-no-search-results').remove();
         }
     });
+}
+
+/**
+ * Initialize rating system for reviews
+ */
+function initReviewSystem() {
+    if (!$('.tb-review-form').length) {
+        return;
+    }
+
+    // Star rating selection
+    var $ratingStars = $('.tb-rating-star');
+    if (!$ratingStars.length) return;
+    
+    $ratingStars.on('mouseover', function() {
+        var rating = $(this).data('rating');
+        if (!rating) return;
         
-        // Password match indicator
-        $('#confirm_password').on('keyup', function() {
-            var password = $('#new_password').val();
-            var confirmPassword = $(this).val();
-            var $matchIndicator = $('#password-match');
-            
-            if (!confirmPassword || !$matchIndicator.length) {
-                $matchIndicator.hide();
-                return;
-            }
-            
-            $matchIndicator.show();
-            
-            if (password === confirmPassword) {
-                $matchIndicator.removeClass('tb-error').addClass('tb-success').text('Passwords match');
+        // Highlight stars
+        $ratingStars.each(function() {
+            if ($(this).data('rating') <= rating) {
+                $(this).find('i').removeClass('far').addClass('fas');
             } else {
-                $matchIndicator.removeClass('tb-success').addClass('tb-error').text('Passwords do not match');
+                $(this).find('i').removeClass('fas').addClass('far');
             }
-        });
-        
-        // Mobile sidebar toggle
-        $('.tb-mobile-sidebar-toggle').on('click', function() {
-            $('.tb-sidebar').toggleClass('active');
         });
     });
+    
+    $ratingStars.on('mouseout', function() {
+        if ($('#tb-review-rating').val()) {
+            // If a rating is already selected, maintain that selection
+            var selectedRating = parseInt($('#tb-review-rating').val());
+            $ratingStars.each(function() {
+                if ($(this).data('rating') <= selectedRating) {
+                    $(this).find('i').removeClass('far').addClass('fas');
+                } else {
+                    $(this).find('i').removeClass('fas').addClass('far');
+                }
+            });
+        } else {
+            // Otherwise reset to empty stars
+            $ratingStars.find('i').removeClass('fas').addClass('far');
+        }
+    });
+    
+    $ratingStars.on('click', function() {
+        var rating = $(this).data('rating');
+        if (!rating) return;
+        
+        // Set rating value
+        $('#tb-review-rating').val(rating);
+        
+        // Update selected stars
+        $ratingStars.each(function() {
+            if ($(this).data('rating') <= rating) {
+                $(this).find('i').removeClass('far').addClass('fas');
+            } else {
+                $(this).find('i').removeClass('fas').addClass('far');
+            }
+        });
+    });
+
+    // AJAX form submission
+    $('#tb-review-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var $form = $(this);
+        var $submitButton = $('#tb-submit-review');
+        var $response = $('#tb-review-response');
+        var rating = $('#tb-review-rating').val();
+        var content = $('#tb-review-content').val();
+        
+        // Validate input
+        if (!rating) {
+            $response.html('<div class="tb-error-message">Please select a rating.</div>').show();
+            return;
+        }
+        
+        if (!content.trim()) {
+            $response.html('<div class="tb-error-message">Please write a review.</div>').show();
+            return;
+        }
+        
+        // Disable submit button and show loading
+        $submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Submitting...');
+        $response.hide();
+        
+        // Send AJAX request
+        $.ajax({
+            url: params.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'tb_submit_review',
+                court_id: $form.find('input[name="court_id"]').val(),
+                rating: rating,
+                content: content,
+                nonce: $form.find('input[name="tb_review_nonce"]').val()
+            },
+            success: function(response) {
+                $submitButton.prop('disabled', false).html('Submit Review');
+                
+                if (response.success) {
+                    $response.html('<div class="tb-success-message">' + response.data.message + '</div>').show();
+                    
+                    // Clear form
+                    $('#tb-review-rating').val('');
+                    $('#tb-review-content').val('');
+                    $ratingStars.find('i').removeClass('fas').addClass('far');
+                    
+                    // Reload page after a delay to show the new review
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    $response.html('<div class="tb-error-message">' + response.data.message + '</div>').show();
+                }
+            },
+            error: function() {
+                $submitButton.prop('disabled', false).html('Submit Review');
+                $response.html('<div class="tb-error-message">An error occurred. Please try again.</div>').show();
+            }
+        });
+    });
+}
+
+/**
+ * Setup Font Awesome if needed
+ */
+function setupFontAwesome() {
+    // Check if Font Awesome is already loaded
+    if (typeof FontAwesome !== 'undefined' || $('.fa, .fas, .far, .fab').length > 0) {
+        return;
+    }
+    
+    // Add Font Awesome from CDN if not loaded
+    $('head').append('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />');
+}
+
+/**
+ * Escape HTML special characters
+ * 
+ * @param {string} unsafe The unsafe string
+ * @return {string} Safe HTML string
+ */
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Initialize UI elements that need to be available on load
+$(function() {
+    // Handle action dropdown menus
+    $('.tb-action-button').on('click', function(e) {
+        e.stopPropagation();
+        var $dropdown = $(this).siblings('.tb-dropdown-menu');
+        $('.tb-dropdown-menu').not($dropdown).removeClass('active');
+        $dropdown.toggleClass('active');
+    });
+    
+    // Close dropdowns when clicking outside
+    $(document).on('click', function() {
+        $('.tb-dropdown-menu.active').removeClass('active');
+    });
+    
+    // Prevent dropdown closing when clicking inside it
+    $('.tb-dropdown-menu').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Mobile sidebar toggle
+    $('.tb-mobile-sidebar-toggle').on('click', function() {
+        $('.tb-sidebar').toggleClass('active');
+    });
+});
 })(jQuery, window, document);

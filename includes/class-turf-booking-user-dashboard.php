@@ -477,7 +477,7 @@ class Turf_Booking_User_Dashboard {
         ?>
         <div class="tb-dashboard-wrapper">
             <!-- Left Sidebar Navigation -->
-            <div class="tb-sidebar">
+            <div class="tb-sidebar-nav">
                 <ul class="tb-nav-menu">
                     <li class="active">
                         <a href="<?php echo esc_url(add_query_arg('tab', 'dashboard', remove_query_arg(array('action', 'id', 'error', 'message')))); ?>">
@@ -1044,18 +1044,103 @@ class Turf_Booking_User_Dashboard {
         return ob_get_clean();
     }
     
-    /**
-     * Get profile content
-     */
-    private function get_profile_content($user_id) {
-        // Get user data
-        $user = get_userdata($user_id);
+
+    // Add this code to your includes/class-turf-booking-user-dashboard.php file
+// Add these functions to handle profile image upload
+
+/**
+ * Process profile image upload
+ */
+public function process_profile_image_upload() {
+    // Check if user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('You must be logged in to upload an image.', 'turf-booking')));
+    }
+    
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tb_profile_image_nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'turf-booking')));
+    }
+    
+    // Check if file is uploaded
+    if (!isset($_FILES['profile_image']) || empty($_FILES['profile_image']['name'])) {
+        wp_send_json_error(array('message' => __('No file was uploaded.', 'turf-booking')));
+    }
+    
+    $user_id = get_current_user_id();
+    
+    // WordPress upload handling
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    
+    // Handle file upload
+    $attachment_id = media_handle_upload('profile_image', 0);
+    
+    if (is_wp_error($attachment_id)) {
+        wp_send_json_error(array('message' => $attachment_id->get_error_message()));
+    }
+    
+    // Save attachment ID as user meta
+    update_user_meta($user_id, 'tb_profile_image', $attachment_id);
+    
+    // Get the image URL
+    $image_url = wp_get_attachment_image_url($attachment_id, 'thumbnail');
+    
+    wp_send_json_success(array(
+        'message' => __('Profile image updated successfully.', 'turf-booking'),
+        'image_url' => $image_url
+    ));
+}
+
+/**
+ * Remove profile image
+ */
+public function remove_profile_image() {
+    // Check if user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('You must be logged in to remove an image.', 'turf-booking')));
+    }
+    
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tb_profile_image_nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'turf-booking')));
+    }
+    
+    $user_id = get_current_user_id();
+    
+    // Get current profile image
+    $attachment_id = get_user_meta($user_id, 'tb_profile_image', true);
+    
+    if ($attachment_id) {
+        // Delete the attachment
+        wp_delete_attachment($attachment_id, true);
         
-        ob_start();
-        ?>
-        <div class="tb-dashboard-wrapper">
-            <!-- Left Sidebar Navigation -->
-            <div class="tb-sidebar">
+        // Remove the user meta
+        delete_user_meta($user_id, 'tb_profile_image');
+    }
+    
+    wp_send_json_success(array('message' => __('Profile image removed.', 'turf-booking')));
+}
+
+/**
+ * Modify the get_profile_content method to add the custom profile image functionality
+ * Replace the relevant part in your existing method
+ */
+private function get_profile_content($user_id) {
+    // Get user data
+    $user = get_userdata($user_id);
+    
+    // Get custom profile image if exists
+    $profile_image_id = get_user_meta($user_id, 'tb_profile_image', true);
+    $profile_image_url = $profile_image_id ? wp_get_attachment_image_url($profile_image_id, 'thumbnail') : get_avatar_url($user_id, array('size' => 150));
+    
+    ob_start();
+    // Your existing HTML output here...
+    ?>
+    <div class="tb-dashboard-wrapper">
+        <!-- Left Sidebar Navigation -->
+       <div class="tb-sidebar">
                 <ul class="tb-nav-menu">
                     <li>
                         <a href="<?php echo esc_url(add_query_arg('tab', 'dashboard', remove_query_arg(array('action', 'id', 'error', 'message')))); ?>">
@@ -1074,79 +1159,89 @@ class Turf_Booking_User_Dashboard {
                     </li>
                 </ul>
             </div>
+        
+        <!-- Main Content Area -->
+        <div class="tb-main-content">
+            <div class="tb-page-header">
+                <h1><?php _e('Profile', 'turf-booking'); ?></h1>
+                <p><?php _e('Manage your account settings and preferences.', 'turf-booking'); ?></p>
+            </div>
             
-            <!-- Main Content Area -->
-            <div class="tb-main-content">
-                <div class="tb-page-header">
-                    <h1><?php _e('Profile', 'turf-booking'); ?></h1>
-                    <p><?php _e('Manage your account settings and preferences.', 'turf-booking'); ?></p>
+            <?php if (isset($_GET['message']) && $_GET['message'] === 'profile_updated') : ?>
+                <div class="tb-message tb-success">
+                    <p><?php _e('Your profile has been updated successfully.', 'turf-booking'); ?></p>
                 </div>
-                
-                <?php if (isset($_GET['message']) && $_GET['message'] === 'profile_updated') : ?>
-                    <div class="tb-message tb-success">
-                        <p><?php _e('Your profile has been updated successfully.', 'turf-booking'); ?></p>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if (isset($_GET['error'])) : ?>
-                    <div class="tb-message tb-error">
-                        <?php
-                        $error = sanitize_text_field($_GET['error']);
-                        
-                        switch ($error) {
-                            case 'email_exists':
-                                _e('Email address is already registered.', 'turf-booking');
-                                break;
-                            case 'invalid_password':
-                                _e('Current password is incorrect.', 'turf-booking');
-                                break;
-                            case 'password_mismatch':
-                                _e('New passwords do not match.', 'turf-booking');
-                                break;
-                            case 'update_failed':
-                                _e('Failed to update profile.', 'turf-booking');
-                                break;
-                            default:
-                                _e('An error occurred. Please try again.', 'turf-booking');
-                                break;
-                        }
-                        ?>
-                    </div>
-                <?php endif; ?>
-                
-                <div class="tb-profile-section">
-                    <div class="tb-section-card">
-                        <div class="tb-section-title">
-                            <h2><?php _e('Profile Picture', 'turf-booking'); ?></h2>
-                            <p><?php _e('This will be displayed on your profile and bookings.', 'turf-booking'); ?></p>
-                        </div>
-                        
-                        <div class="tb-profile-picture-container">
-                            <div class="tb-profile-picture">
-                                <?php 
-                                $avatar_url = get_avatar_url($user_id, array('size' => 150));
-                                ?>
-                                <img src="<?php echo esc_url($avatar_url); ?>" alt="<?php echo esc_attr($user->display_name); ?>">
-                            </div>
-                            
-                            <div class="tb-profile-picture-actions">
-                                <button class="tb-button tb-button-outline"><?php _e('Upload new picture', 'turf-booking'); ?></button>
-                                <button class="tb-button tb-button-text tb-text-danger"><?php _e('Remove', 'turf-booking'); ?></button>
-                            </div>
-                        </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['error'])) : ?>
+                <div class="tb-message tb-error">
+                    <?php
+                    $error = sanitize_text_field($_GET['error']);
+                    
+                    switch ($error) {
+                        case 'email_exists':
+                            _e('Email address is already registered.', 'turf-booking');
+                            break;
+                        case 'invalid_password':
+                            _e('Current password is incorrect.', 'turf-booking');
+                            break;
+                        case 'password_mismatch':
+                            _e('New passwords do not match.', 'turf-booking');
+                            break;
+                        case 'update_failed':
+                            _e('Failed to update profile.', 'turf-booking');
+                            break;
+                        default:
+                            _e('An error occurred. Please try again.', 'turf-booking');
+                            break;
+                    }
+                    ?>
+                </div>
+            <?php endif; ?>
+            
+            <div class="tb-profile-section">
+                <div class="tb-section-card">
+                    <div class="tb-section-title">
+                        <h2><?php _e('Profile Picture', 'turf-booking'); ?></h2>
+                        <p><?php _e('This will be displayed on your profile and bookings.', 'turf-booking'); ?></p>
                     </div>
                     
-                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" class="tb-profile-form">
-                        <input type="hidden" name="action" value="tb_update_profile">
-                        <?php wp_nonce_field('tb_update_profile', 'tb_profile_nonce'); ?>
+                    <div class="tb-profile-picture-container">
+                        <div class="tb-profile-picture">
+                            <img src="<?php echo esc_url($profile_image_url); ?>" alt="<?php echo esc_attr($user->display_name); ?>" id="tb-profile-image-preview">
+                        </div>
                         
-                        <div class="tb-section-card">
+                        <div class="tb-profile-picture-actions">
+                            <!-- Add file input and form for image upload -->
+                            <form id="tb-profile-image-form" enctype="multipart/form-data">
+                                <input type="file" name="profile_image" id="tb-profile-image-input" style="display:none" accept="image/*">
+                                <input type="hidden" name="action" value="tb_profile_image_upload">
+                                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('tb_profile_image_nonce'); ?>">
+                            </form>
+                            
+                            <button class="tb-button tb-button-outline" id="tb-upload-image-btn"><?php _e('Upload new picture', 'turf-booking'); ?></button>
+                            <button class="tb-button tb-button-text tb-text-danger" id="tb-remove-image-btn"><?php _e('Remove', 'turf-booking'); ?></button>
+                            
+                            <div id="tb-image-upload-messages"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" class="tb-profile-form">
+                    <input type="hidden" name="action" value="tb_update_profile">
+                    <?php wp_nonce_field('tb_update_profile', 'tb_profile_nonce'); ?>
+                    
+                   <div class="tb-section-card">
                             <div class="tb-section-title">
                                 <h2><?php _e('Personal Information', 'turf-booking'); ?></h2>
                                 <p><?php _e('Update your personal details.', 'turf-booking'); ?></p>
                             </div>
                             
                             <div class="tb-form-row">
+                                  <div class="tb-form-group" style="display:none;">
+                        <input type="hidden" name="display_name" id="display_name" value="<?php echo esc_attr($user->display_name); ?>">
+                    </div>
+                    
                                 <div class="tb-form-group">
                                     <label for="first_name"><?php _e('First name', 'turf-booking'); ?></label>
                                     <input type="text" name="first_name" id="first_name" class="tb-input" value="<?php echo esc_attr($user->first_name); ?>">
@@ -1193,18 +1288,102 @@ class Turf_Booking_User_Dashboard {
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="tb-form-actions">
-                            <button type="submit" class="tb-button tb-button-primary"><?php _e('Save changes', 'turf-booking'); ?></button>
-                        </div>
-                    </form>
-                </div>
+                   
+
+                    <div class="tb-form-actions">
+                        <button type="submit" class="tb-button tb-button-primary"><?php _e('Save changes', 'turf-booking'); ?></button>
+                    </div>
+                </form>
             </div>
         </div>
-        <?php
-        return ob_get_clean();
-    }
+    </div>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Profile image upload button
+        $('#tb-upload-image-btn').on('click', function(e) {
+            e.preventDefault();
+            $('#tb-profile-image-input').trigger('click');
+        });
+        
+        // Handle file selection
+        $('#tb-profile-image-input').on('change', function() {
+            if (this.files && this.files[0]) {
+                // Show a preview of the selected image
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#tb-profile-image-preview').attr('src', e.target.result);
+                }
+                reader.readAsDataURL(this.files[0]);
+                
+                // Submit the form via AJAX
+                var formData = new FormData($('#tb-profile-image-form')[0]);
+                
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    beforeSend: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-loading">Uploading image...</p>');
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#tb-image-upload-messages').html('<p class="tb-success">' + response.data.message + '</p>');
+                            // Update image if URL is returned
+                            if (response.data.image_url) {
+                                $('#tb-profile-image-preview').attr('src', response.data.image_url);
+                            }
+                        } else {
+                            $('#tb-image-upload-messages').html('<p class="tb-error">' + response.data.message + '</p>');
+                        }
+                    },
+                    error: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-error">Error uploading image. Please try again.</p>');
+                    }
+                });
+            }
+        });
+        
+        // Remove profile image
+        $('#tb-remove-image-btn').on('click', function(e) {
+            e.preventDefault();
+            
+            if (confirm('Are you sure you want to remove your profile picture?')) {
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'tb_profile_image_remove',
+                        nonce: '<?php echo wp_create_nonce('tb_profile_image_nonce'); ?>'
+                    },
+                    beforeSend: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-loading">Removing image...</p>');
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#tb-image-upload-messages').html('<p class="tb-success">' + response.data.message + '</p>');
+                            // Reset to default avatar
+                            $('#tb-profile-image-preview').attr('src', '<?php echo get_avatar_url($user_id, array('size' => 150)); ?>');
+                        } else {
+                            $('#tb-image-upload-messages').html('<p class="tb-error">' + response.data.message + '</p>');
+                        }
+                    },
+                    error: function() {
+                        $('#tb-image-upload-messages').html('<p class="tb-error">Error removing image. Please try again.</p>');
+                    }
+                });
+            }
+        });
+    });
+    </script>
     
+    <?php
+    return ob_get_clean();
+}
+
+ 
     /**
      * Get booking details
      */

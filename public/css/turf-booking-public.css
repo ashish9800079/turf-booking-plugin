@@ -1,15 +1,13 @@
-/**
- * Public styles for Turf Booking System
- */
 @font-face {
-	font-family: 'Feather';
+	font-family: 'feather';
 	src:
-	url('/Feather.ttf') format('truetype'),
-	url('/Feather.woff') format('woff'),
-	url('/Feather.svg') format('svg');
+	url('https://cdn.shopify.com/s/files/1/0675/7066/3587/files/feather.ttf?v=1743341491') format('truetype'),
+	url('https://cdn.shopify.com/s/files/1/0675/7066/3587/files/feather.woff?v=1743341491') format('woff'),
+	url('https://district9.co.in/wp-content/uploads/2025/05/feather-c4719c.svg') format('svg');
 	font-weight: normal;
 	font-style: normal;
 }
+
 #tb-booking-error {
     transition: background-color 0.8s;
 }
@@ -1174,6 +1172,10 @@
 }
 
 @media screen and (max-width: 768px) {
+    .playo-blog-section {
+    margin-right: 10px;
+    margin-left: 10px;
+}
     .tb-court-header-content {
         flex-direction: column;
         align-items: flex-start;
@@ -2557,7 +2559,7 @@ textarea#tb-review-content {
 .tb-courts-slider-container .tb-slider-nav {
     display: flex;
     gap: 0px;
-    margin-top: 3rem;
+    margin-top: 2rem;
     justify-content: center;
 }
 .tb-courts-slider-container .tb-slider-nav button {
@@ -2619,7 +2621,7 @@ textarea#tb-review-content {
     border: none;
 }
 /* Sidebar Styles */
-.tb-sidebar {
+.tb-dashboard-wrapper .tb-sidebar {
     width: 280px;
     background-color: #fff;
     border-right: 1px solid #eaedf3;
@@ -2627,17 +2629,17 @@ textarea#tb-review-content {
     flex-shrink: 0;
 }
 
-.tb-nav-menu {
+.tb-dashboard-wrapper .tb-nav-menu {
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
-.tb-nav-menu li {
+.tb-dashboard-wrapper .tb-nav-menu li {
     margin-bottom: 5px;
 }
 
-.tb-nav-menu li a {
+.tb-dashboard-wrapper .tb-nav-menu li a {
     display: flex;
     align-items: center;
     padding: 12px 24px;
@@ -2648,18 +2650,18 @@ textarea#tb-review-content {
     transition: all 0.2s ease;
 }
 
-.tb-nav-menu li a i {
+.tb-dashboard-wrapper .tb-nav-menu li a i {
     margin-right: 12px;
     font-size: 18px;
     width: 20px;
     text-align: center;
 }
 
-.tb-nav-menu li a:hover {
+.tb-dashboard-wrapper .tb-nav-menu li a:hover {
     background-color: #f7fafc;
 }
 
-.tb-nav-menu li.active a {
+.tb-dashboard-wrapper .tb-nav-menu li.active a {
     background-color: #f5f5f5;
     border-radius: 10px;
 }
@@ -2667,13 +2669,13 @@ textarea#tb-review-content {
     margin: 0px 12px !important;
 }
 /* Main Content Area */
-.tb-main-content {
+.tb-dashboard-wrapper .tb-main-content {
     flex: 1;
     padding: 30px;
     overflow-y: auto;
 }
 
-.tb-page-header {
+.tb-dashboard-wrapper .tb-page-header {
     margin-bottom: 30px;
 }
 
@@ -2714,37 +2716,37 @@ textarea#tb-review-content {
 }
 
 /* Messages */
-.tb-message {
+.tb-dashboard-wrapper .tb-message {
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;
 }
 
-.tb-message p {
+.tb-dashboard-wrapper .tb-message p {
     margin: 0;
 }
 
-.tb-success {
+.tb-dashboard-wrapper .tb-success {
     background-color: #c6f6d5;
     color: #2f855a;
     border: 1px solid #9ae6b4;
 }
 
-.tb-error {
+.tb-dashboard-wrapper .tb-error {
     background-color: #fed7d7;
     color: #c53030;
     border: 1px solid #feb2b2;
 }
 
 /* Stats Cards */
-.tb-stats-cards {
+.tb-dashboard-wrapper .tb-stats-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
 
-.tb-stat-card {
+.tb-dashboard-wrapper .tb-stat-card {
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -2823,7 +2825,7 @@ textarea#tb-review-content {
 
 .tb-view-all {
     font-size: 14px;
-    color: #eeee22;
+    color: #707070;
     text-decoration: none;
     font-weight: 500;
 }
@@ -2833,7 +2835,7 @@ textarea#tb-review-content {
 }
 
 /* Section Cards */
-.tb-section-card {
+.tb-dashboard-wrapper .tb-section-card {
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -2841,7 +2843,7 @@ textarea#tb-review-content {
     margin-bottom: 24px;
 }
 
-.tb-section-card .tb-section-title {
+.tb-dashboard-wrapper .tb-section-card .tb-section-title {
     margin-bottom: 20px;
 }
 
@@ -2873,7 +2875,7 @@ textarea#tb-review-content {
     margin-bottom: 20px;
 }
 
-.tb-booking-icon {
+.tb-dashboard-wrapper .tb-booking-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2886,7 +2888,7 @@ textarea#tb-review-content {
     margin-right: 16px;
 }
 
-.tb-booking-title h3 {
+.tb-dashboard-wrapper .tb-booking-title h3 {
     font-size: 18px;
     font-weight: 600;
     color: #1a202c;
@@ -2923,7 +2925,7 @@ textarea#tb-review-content {
     color: #4a5568;
 }
 
-.tb-booking-actions {
+.tb-dashboard-wrapper .tb-booking-actions {
     display: flex;
     justify-content: flex-end;
     margin-top: 24px;
@@ -2955,20 +2957,20 @@ textarea#tb-review-content {
     border-bottom: none;
 }
 
-.tb-booking-info h3 {
+.tb-dashboard-wrapper .tb-booking-info h3 {
     font-size: 16px;
     font-weight: 500;
     color: #1a202c;
     margin: 0 0 5px;
 }
 
-.tb-booking-info p {
+.tb-dashboard-wrapper .tb-booking-info p {
     font-size: 14px;
     color: #718096;
     margin: 0;
 }
 
-.tb-booking-status {
+.tb-dashboard-wrapper .tb-booking-status {
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 12px;
@@ -3362,7 +3364,7 @@ textarea#tb-review-content {
     font-size: 24px;
 }
 
-.tb-booking-court-details h2 {
+.tb-dashboard-wrapper .tb-booking-court-details h2 {
     font-size: 20px;
     font-weight: 600;
     color: #1a202c;
@@ -3376,13 +3378,13 @@ textarea#tb-review-content {
     margin-bottom: 12px;
 }
 
-.tb-booking-date-time {
+.tb-dashboard-wrapper .tb-booking-date-time {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.tb-booking-date,
+.tb-dashboard-wrapper .tb-booking-date,
 .tb-booking-time,
 .tb-booking-location {
     display: flex;
@@ -3414,13 +3416,13 @@ textarea#tb-review-content {
     margin-bottom: 4px;
 }
 
-.tb-detail-value {
+.tb-dashboard-wrapper .tb-detail-value {
     font-size: 14px;
     color: #1a202c;
     font-weight: 500;
 }
 
-.tb-payment-status {
+.tb-dashboard-wrapper .tb-payment-status {
     display: inline-block;
     padding: 4px 8px;
     border-radius: 20px;
@@ -3489,7 +3491,16 @@ textarea#tb-review-content {
 }
 /* Responsive Styles */
 @media screen and (max-width: 768px) {
-    
+    .tb-dropdown-menu {
+    top: auto !important;
+    left: 50%;
+    bottom: 24px !important;
+    transform: translateX(-50%);
+}.tb-dropdown-menu.active {
+    display: block;
+}
+
+
     .tb-nav-menu li a svg {
     width: 20px;
 }
@@ -3505,10 +3516,11 @@ textarea#tb-review-content {
     align-items: unset !important;
 }
     
-      .tb-sidebar {
+      .tb-sidebar-nav {
         width: 100%;
         position: fixed;
         bottom: 0;
+        background: #fff;
         margin: 0;
         left: 0;
         padding: 10px 0;
@@ -3674,4 +3686,253 @@ textarea#tb-review-content {
 }
 .tb-page-header p {
     padding: 0 !important;
+}
+
+
+
+/* Add these styles to your public/css/turf-booking-public.css file */
+
+/* Filter and sort dropdown styling */
+.tb-dashboard-wrapper .tb-date-picker-container,
+.tb-filter-dropdown {
+    position: absolute;
+    z-index: 100;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    margin-top: 5px;
+}
+
+.tb-date-filter-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tb-filter-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Animation for the loading state */
+.tb-loading-row {
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+/* Messages styling */
+.tb-message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 4px;
+}
+
+.tb-success {
+    background-color: #e7f7ee;
+    border: 1px solid #34c759;
+    color: #1d7738;
+}
+
+.tb-error {
+    background-color: #feeef0;
+    border: 1px solid #ff3b30;
+    color: #c01e1e;
+}
+
+
+
+/* No results message */
+.tb-no-filtered-bookings {
+    padding: 15px;
+    margin: 15px 0;
+    text-align: center;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px dashed #ddd;
+}
+
+/* Profile image upload styling */
+.tb-profile-picture-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+    .tb-profile-picture-container {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+}
+
+.tb-profile-picture {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #f0f0f0;
+    background-color: #f8f9fa;
+    position: relative;
+}
+
+.tb-profile-picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.tb-profile-picture:hover::after {
+    content: '\f030';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.tb-profile-picture-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+#tb-image-upload-messages {
+    margin-top: 10px;
+}
+
+#tb-image-upload-messages p {
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 0;
+}
+
+
+
+#tb-image-upload-messages p.tb-success {
+    background-color: #e7f7ee;
+    border: 1px solid #34c759;
+    color: #1d7738;
+}
+
+#tb-image-upload-messages p.tb-error {
+    background-color: #feeef0;
+    border: 1px solid #ff3b30;
+    color: #c01e1e;
+}
+
+/* Password strength and match indicators */
+#password-strength,
+#password-match {
+    margin-top: 5px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: inline-block;
+    font-size: 12px;
+}
+
+.very-weak {
+    background-color: #feeef0;
+    color: #c01e1e;
+}
+
+.weak {
+    background-color: #fff3e0;
+    color: #e67700;
+}
+
+.medium {
+    background-color: #fff8e1;
+    color: #ffa000;
+}
+
+.strong {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.very-strong {
+    background-color: #e0f2f1;
+    color: #00695c;
+}
+
+/* Form validation messages */
+.tb-form-message {
+    font-size: 12px;
+    margin-top: 5px;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+/* Action dropdown menu styles */
+.tb-action-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.tb-action-button {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tb-action-button:hover {
+    background-color: #e9ecef;
+}
+
+.tb-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 100;
+    min-width: 180px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+.tb-action-dropdown:hover .tb-dropdown-menu {
+    display: block;
+}
+
+.tb-dropdown-item {
+    display: block;
+    padding: 8px 15px;
+    color: #333;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.tb-dropdown-item:hover {
+    background-color: #f8f9fa;
+    text-decoration: none;
+}
+
+.tb-text-danger {
+    color: #dc3545 !important;
+}
+
+.tb-dropdown-item.tb-text-danger:hover {
+    background-color: #feeef0;
 }

@@ -205,14 +205,22 @@ if (is_user_logged_in()) {
     <p class="tb-login-message"><?php _e('Please log in to your account to complete your booking.', 'turf-booking'); ?></p>
     
     <div class="tb-login-actions">
-        <a href="<?php echo esc_url(wp_login_url(add_query_arg(array('court_id' => $court_id), get_permalink()))); ?>" class="tb-login-button">
-            <?php _e('Login', 'turf-booking'); ?>
+        <?php
+// Create a clean relative URL for the redirect
+$relative_path = '/booking/'; // Hard-code the path to ensure correctness
+$redirect_url = $relative_path . '?court_id=' . intval($court_id); // Build a clean URL with just what's needed
+?>
+       <a href="#" onclick="openLoginPopup('login', '<?php echo esc_js($redirect_url); ?>'); return false;" class="tb-login-button"><?php _e('Login', 'turf-booking'); ?></a>
+            
         </a>
         
         <?php if (get_option('users_can_register')) : ?>
             <p class="tb-register-link">
                 <?php _e("Don't have an account?", 'turf-booking'); ?> 
-                <a href="<?php echo esc_url(wp_registration_url()); ?>"><?php _e('Register', 'turf-booking'); ?></a>
+                
+
+
+                <a href="#" onclick="openLoginPopup('login', '<?php echo esc_js($redirect_url); ?>'); return false;"><?php _e('Register', 'turf-booking'); ?></a>
             </p>
         <?php endif; ?>
     </div>
